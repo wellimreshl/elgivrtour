@@ -1,0 +1,4899 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ELGI VR TOUR</title>
+
+  <!-- GSAP -->
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+
+  <!-- Three.js from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.129.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.129.0/examples/js/controls/OrbitControls.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.129.0/examples/js/loaders/GLTFLoader.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.129.0/examples/js/loaders/DRACOLoader.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.129.0/examples/js/webxr/VRButton.js"></script>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Inter', sans-serif;
+    }
+
+    body {
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    #container3D {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    /* ================= LOADING ================= */
+    #loadingScreen {
+      position: fixed;
+      inset: 0;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.9s ease;
+    }
+
+    #loadingScreen.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loading-card {
+      background: #ea2f1c;
+      padding: 46px 54px;
+      border-radius: 16px;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+      border: 2px solid #000000;
+      z-index: 10000;
+    }
+
+    .loading-card img {
+      width: 150px;
+      margin-bottom: 22px;
+      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+    }
+
+    .loading-card h2 {
+      font-size: 22px;
+      color: #ffffff;
+      margin-bottom: 18px;
+      letter-spacing: 1.5px;
+    }
+
+    .spinner {
+      width: 34px;
+      height: 34px;
+      border: 4px solid #ffffff;
+      border-top: 4px solid #000000;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 14px;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .loading-card span {
+      font-size: 15px;
+      color: #ffffff;
+    }
+
+    /* ================= TOP BAR ================= */
+    .top-bar {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 92%;
+      max-width: 500px;
+      height: 70px;
+      background: #ea2f1c;
+      color: #ffffff;
+      border-radius: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      z-index: 100;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      border: 2px solid #000000;
+      opacity: 0;
+      transition: opacity 1.5s ease;
+    }
+
+    .top-bar.visible {
+      opacity: 1;
+    }
+
+    .top-bar h1 {
+      font-size: 26px;
+      letter-spacing: 2px;
+      font-weight: 700;
+    }
+
+    .top-bar span {
+      font-size: 16px;
+      letter-spacing: 1px;
+      color: #ffffff;
+      font-weight: 300;
+    }
+
+    /* ================= HELP BUTTON ================= */
+    .help-button {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 50px;
+      height: 50px;
+      background: #ea2f1c;
+      color: #ffffff;
+      border: 2px solid #000000;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 1000;
+      font-size: 20px;
+      transition: all 0.3s ease;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+
+    .help-button.visible {
+      opacity: 1;
+    }
+
+    .help-button:hover {
+      background: #000000;
+      transform: scale(1.1);
+    }
+
+    /* Mobile positioning */
+    @media (max-width: 768px) {
+      .help-button {
+        top: 20px;
+        right: 15px;
+        width: 45px;
+        height: 45px;
+      }
+    }
+
+    /* ================= HELP TUTORIAL - NO SCROLLBAR ================= */
+    .tutorial-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .tutorial-overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .tutorial-container {
+      background: #ffffff;
+      border-radius: 20px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow: hidden;
+      border: 3px solid #ea2f1c;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      transform: translateY(20px);
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+
+    .tutorial-overlay.active .tutorial-container {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .tutorial-header {
+      background: #ea2f1c;
+      color: #ffffff;
+      padding: 20px;
+      border-radius: 17px 17px 0 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #000000;
+    }
+
+    .tutorial-header h2 {
+      font-size: 22px;
+      letter-spacing: 1px;
+    }
+
+    .close-tutorial {
+      background: #ffffff;
+      color: #ea2f1c;
+      border: 2px solid #000000;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 20px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+
+    .close-tutorial:hover {
+      background: #000000;
+      color: #ffffff;
+    }
+
+    .tutorial-content {
+      padding: 25px;
+      overflow-y: auto;
+      max-height: calc(80vh - 180px);
+    }
+
+    .tutorial-content::-webkit-scrollbar {
+      display: none;
+    }
+
+    .tutorial-content {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    .tutorial-step {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #eeeeee;
+    }
+
+    .tutorial-step:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .step-number {
+      background: #ea2f1c;
+      color: #ffffff;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      margin-right: 15px;
+      flex-shrink: 0;
+      border: 2px solid #000000;
+    }
+
+    .step-content h3 {
+      color: #ea2f1c;
+      margin-bottom: 5px;
+      font-size: 16px;
+    }
+
+    .step-content p {
+      color: #666666;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .tutorial-footer {
+      padding: 15px 25px 25px;
+      text-align: center;
+      border-top: 2px solid #eeeeee;
+    }
+
+    .tutorial-footer button {
+      background: #ea2f1c;
+      color: #ffffff;
+      border: 2px solid #000000;
+      padding: 12px 30px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 16px;
+      transition: all 0.3s ease;
+    }
+
+    .tutorial-footer button:hover {
+      background: #000000;
+      transform: translateY(-2px);
+    }
+
+    /* Mobile tutorial styles */
+    @media (max-width: 768px) {
+      .tutorial-container {
+        width: 95%;
+        max-height: 85vh;
+      }
+
+      .tutorial-content {
+        padding: 20px;
+        max-height: calc(85vh - 180px);
+      }
+
+      .tutorial-step {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .step-number {
+        margin-bottom: 10px;
+      }
+    }
+
+    /* ================= PIN MANAGEMENT PANEL ================= */
+    .pin-manager {
+      position: fixed;
+      top: 160px;
+      right: 30px;
+      width: 280px;
+      background: #ea2f1c;
+      color: #ffffff;
+      border-radius: 20px;
+      padding: 12px;
+      z-index: 1000;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+      border: 2px solid #000000;
+      display: none;
+      opacity: 0;
+      transform: translateX(20px);
+      transition: all 0.3s ease;
+    }
+
+    .pin-manager.active {
+      display: block;
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .pin-manager-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #000000;
+    }
+
+    .pin-manager-header h3 {
+      color: #ffffff;
+      font-size: 14px;
+    }
+
+    .close-manager {
+      background: #ffffff;
+      border: none;
+      color: #ea2f1c;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      border: 2px solid #000000;
+      font-size: 14px;
+    }
+
+    .close-manager:hover {
+      background: #000000;
+      color: #ffffff;
+    }
+
+    .pin-search-container {
+      position: relative;
+      margin-bottom: 12px;
+    }
+
+    .pin-search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #ea2f1c;
+      font-size: 14px;
+      pointer-events: none;
+    }
+
+    #pinSearchInput {
+      width: 100%;
+      padding: 10px 12px 10px 35px;
+      border-radius: 20px;
+      border: 2px solid #000000;
+      background: #ffffff;
+      color: #333;
+      font-size: 14px;
+      outline: none;
+      box-sizing: border-box;
+    }
+
+    #pinSearchInput:focus {
+      border-color: #ea2f1c;
+    }
+
+    .pin-list-container {
+      max-height: 350px;
+      margin-bottom: 10px;
+      padding-right: 0;
+      overflow: hidden;
+    }
+
+    .pin-list {
+      max-height: 350px;
+      overflow-y: auto;
+      padding-right: 5px;
+    }
+
+    .pin-list::-webkit-scrollbar {
+      display: none;
+    }
+
+    .pin-list {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    .pin-item {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 12px 15px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: 2px solid #000000;
+      user-select: none;
+    }
+
+    .pin-item:hover {
+      background: #000000;
+      transform: translateY(-3px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .pin-item.selected {
+      background: #000000;
+      border: 2px solid #ffffff;
+    }
+
+    .pin-item-content {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .pin-name {
+      font-weight: 600;
+      color: #ea2f1c;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+    }
+
+    .pin-item:hover .pin-name,
+    .pin-item.selected .pin-name {
+      color: #ffffff;
+    }
+
+    .pin-subtitle {
+      font-size: 11px;
+      color: #666666;
+    }
+
+    .pin-item:hover .pin-subtitle,
+    .pin-item.selected .pin-subtitle {
+      color: #cccccc;
+    }
+
+    .pin-type-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 9px;
+      border-radius: 12px;
+      background: #ea2f1c;
+      color: #ffffff;
+      margin-left: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border: 1px solid #000000;
+    }
+
+    .pin-item:hover .pin-type-badge,
+    .pin-item.selected .pin-type-badge {
+      background: #ffffff;
+      color: #ea2f1c;
+      border: 1px solid #ffffff;
+    }
+
+    .empty-pins-message {
+      text-align: center;
+      padding: 30px 15px;
+      color: #ffffff;
+      font-style: italic;
+      opacity: 0.8;
+    }
+
+    .empty-pins-message i {
+      font-size: 32px;
+      margin-bottom: 10px;
+      color: #ffffff;
+    }
+
+    .pin-count {
+      text-align: center;
+      font-size: 13px;
+      color: #ffffff;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 2px solid #000000;
+    }
+
+    /* ================= SEARCH MODAL ================= */
+    .search-modal {
+      position: fixed;
+      top: 220px;
+      right: 30px;
+      width: 320px;
+      max-height: calc(100vh - 350px);
+      background: #ea2f1c;
+      color: #ffffff;
+      border-radius: 20px;
+      padding: 15px;
+      z-index: 1001;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+      border: 2px solid #000000;
+      display: none;
+      opacity: 0;
+      transform: translateX(20px);
+      transition: all 0.3s ease;
+      overflow: hidden;
+    }
+
+    .search-modal.active {
+      display: block;
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .search-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #000000;
+    }
+
+    .search-modal-header h3 {
+      font-size: 16px;
+      margin: 0;
+    }
+
+    .close-search {
+      background: #ffffff;
+      border: none;
+      color: #ea2f1c;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      border: 2px solid #000000;
+    }
+
+    .search-input-container {
+      position: relative;
+      margin-bottom: 15px;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #ea2f1c;
+      font-size: 14px;
+      pointer-events: none;
+    }
+
+    #mainSearchInput {
+      width: 100%;
+      padding: 12px 15px 12px 35px;
+      border-radius: 25px;
+      border: 2px solid #000000;
+      background: #ffffff;
+      color: #333;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .search-results {
+      max-height: 200px;
+      overflow-y: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .search-results::-webkit-scrollbar {
+      display: none;
+    }
+
+    .search-result-item {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+      color: #333;
+    }
+
+    .search-result-item:hover {
+      background: #f0f0f0;
+      transform: translateX(5px);
+    }
+
+    .result-title {
+      font-weight: bold;
+      color: #ea2f1c;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .result-desc {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* ================= VIEW TOGGLE - INCREASED GAP ================= */
+    .bottom-toggle {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      background: #ffffff;
+      border-radius: 40px;
+      padding: 6px;
+      z-index: 100;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      border: 2px solid #ea2f1c;
+      gap: 20px;
+      opacity: 0;
+      transition: opacity 1.5s ease;
+    }
+
+    .bottom-toggle.visible {
+      opacity: 1;
+    }
+
+    .bottom-toggle button {
+      border: none;
+      background: transparent;
+      padding: 14px 32px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      color: #ea2f1c;
+      transition: all 0.3s ease;
+      min-width: 100px;
+    }
+
+    .bottom-toggle button:hover {
+      color: #ffffff;
+      background: #ea2f1c;
+      transform: scale(1.05);
+    }
+
+    .bottom-toggle .active {
+      background: #ea2f1c;
+      color: #ffffff;
+    }
+
+    /* ================= ZOOM CONTROLS ================= */
+    .zoom-controls {
+      position: fixed;
+      bottom: 120px;
+      right: 30px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 1.5s ease;
+    }
+
+    .zoom-controls.visible {
+      opacity: 1;
+    }
+
+    .zoom-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: none;
+      background: #ea2f1c;
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+      border: 2px solid #000000;
+    }
+
+    .zoom-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+    }
+
+    .zoom-btn:active {
+      transform: scale(0.95);
+    }
+
+    .zoom-btn.reset {
+      font-size: 20px;
+      background: #ffffff;
+      color: #ea2f1c;
+      border: 2px solid #ea2f1c;
+    }
+
+    .zoom-btn.reset:hover {
+      background: #ea2f1c;
+      color: #ffffff;
+    }
+
+    /* ================= INFO CARD ================= */
+    #infoCard {
+      position: fixed;
+      top: 100px;
+      left: 30px;
+      transform: translateX(-50px);
+      width: 340px;
+      background: #ea2f1c;
+      color: #ffffff;
+      border-radius: 20px;
+      padding: 0;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 200;
+      overflow: hidden;
+      border: 2px solid #000000;
+    }
+
+    #infoCard.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+
+    .card-banner {
+      width: 100%;
+      height: 120px;
+      overflow: hidden;
+      border-radius: 18px 18px 0 0;
+      background: #000000;
+    }
+
+    .card-banner img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      border-bottom: 2px solid #000000;
+    }
+
+    .banner-loading {
+      width: 100%;
+      height: 120px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #000000 0%, #333333 100%);
+      color: #ffffff;
+      font-size: 14px;
+      gap: 15px;
+      border-radius: 18px 18px 0 0;
+    }
+
+    .banner-loading i {
+      font-size: 32px;
+      animation: spin 1s linear infinite;
+    }
+
+    .banner-fallback {
+      width: 100%;
+      height: 120px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #000000 0%, #333333 100%);
+      color: #ffffff;
+      font-size: 18px;
+      gap: 10px;
+      border-radius: 18px 18px 0 0;
+    }
+
+    .banner-fallback i {
+      font-size: 48px;
+      opacity: 0.8;
+    }
+
+    .card-header {
+      padding: 15px 18px 10px 18px;
+      border-bottom: 2px solid #000000;
+      display: flex;
+      align-items: center;
+      background: #ea2f1c;
+    }
+
+    .card-logo {
+      width: 50px;
+      height: 50px;
+      background: #ffffff;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      border: 2px solid #000000;
+    }
+
+    .card-logo span {
+      font-size: 16px;
+      font-weight: 800;
+      color: #ea2f1c;
+      letter-spacing: 1px;
+    }
+
+    .card-title {
+      flex: 1;
+    }
+
+    .card-title h3 {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 2px;
+      color: #ffffff;
+      letter-spacing: 0.5px;
+    }
+
+    .card-title p {
+      font-size: 11px;
+      color: #ffffff;
+      opacity: 0.9;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .card-content {
+      padding: 15px 18px 18px 18px;
+      background: #ea2f1c;
+    }
+
+    .card-description {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #ffffff;
+      margin-bottom: 18px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 10px;
+      border: 2px solid #000000;
+    }
+
+    .card-button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: #ffffff;
+      color: #ea2f1c;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 2px solid #000000;
+    }
+
+    .card-button:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.3);
+      background: #000000;
+      color: #ffffff;
+    }
+
+    .card-button:active {
+      transform: translateY(-1px);
+    }
+
+    .card-vr-button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: #ffffff;
+      color: #ea2f1c;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 2px solid #000000;
+    }
+
+    .card-vr-button:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.3);
+      background: #000000;
+      color: #ffffff;
+    }
+
+    .card-vr-button:active {
+      transform: translateY(-1px);
+    }
+
+    .card-vr-button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      background: #f0f0f0;
+      color: #999999;
+      border: 2px solid #cccccc;
+    }
+
+    .close-button {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 26px;
+      height: 26px;
+      background: #ffffff;
+      border: none;
+      border-radius: 50%;
+      color: #ea2f1c;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: all 0.3s ease;
+      font-weight: bold;
+      border: 2px solid #000000;
+      z-index: 300;
+      pointer-events: auto;
+    }
+
+    .close-button:hover {
+      background: #000000;
+      color: #ffffff;
+      transform: rotate(90deg);
+    }
+
+    /* ================= CONTROL BUTTONS ================= */
+    .control-btn {
+      position: fixed;
+      top: 100px;
+      right: 30px;
+      z-index: 1000;
+      background: #ea2f1c;
+      color: #ffffff;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: 600;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      border: 2px solid #000000;
+      opacity: 0;
+      border: 2px solid #000000;
+      opacity: 0;
+      transition: opacity 1.5s ease;
+    }
+
+    .control-btn.visible {
+      opacity: 1;
+    }
+
+    .control-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+      background: #000000;
+    }
+
+    .control-btn.active {
+      background: #000000;
+      border: 2px solid #ea2f1c;
+    }
+
+    /* AUTO NAV BUTTON */
+    .control-btn-auto {
+      position: fixed;
+      top: 100px;
+      right: 200px;
+      z-index: 1000;
+      background: #ea2f1c;
+      color: #ffffff;
+      border: 2px solid #000000;
+      padding: 12px 24px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: 600;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      gap: 8px;
+      font-size: 14px;
+      transition: all 1.5s ease;
+      opacity: 0;
+    }
+
+    .control-btn-auto.visible {
+      opacity: 1;
+    }
+
+    .control-btn-auto:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+      background: #000000;
+    }
+
+    .control-btn-auto.active {
+      background: #000000;
+      border: 2px solid #ea2f1c;
+      animation: pulse-border 2s infinite;
+    }
+
+    @keyframes pulse-border {
+      0% {
+        box-shadow: 0 0 0 0 rgba(234, 47, 28, 0.4);
+      }
+
+      70% {
+        box-shadow: 0 0 0 10px rgba(234, 47, 28, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(234, 47, 28, 0);
+      }
+    }
+
+    #exitBuildingBtn {
+      position: fixed;
+      bottom: 340px;
+      /* Stack above zoom controls */
+      left: 30px;
+      top: auto;
+      z-index: 1000;
+      background: #ea2f1c;
+      color: #ffffff;
+      border: 2px solid #000000;
+      padding: 12px 24px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: 600;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+      display: none;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+    }
+
+    #exitBuildingBtn.visible {
+      opacity: 1;
+    }
+
+    #exitBuildingBtn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+      background: #000000;
+    }
+
+    /* ================= MOBILE RESPONSIVE STYLES ================= */
+    @media (max-width: 768px) {
+
+      /* Top bar */
+      .top-bar {
+        top: 10px;
+        height: 60px;
+        max-width: 90%;
+      }
+
+      .top-bar h1 {
+        font-size: 22px;
+      }
+
+      .top-bar span {
+        font-size: 14px;
+      }
+
+      /* Pin manager */
+      .pin-manager {
+        top: 120px;
+        right: 15px;
+        left: 15px;
+        width: auto;
+        max-width: calc(100% - 30px);
+      }
+
+      /* Info card */
+      #infoCard {
+        top: 80px;
+        left: 15px;
+        right: 15px;
+        width: auto;
+        max-width: calc(100% - 30px);
+      }
+
+      /* Control buttons */
+      .control-btn {
+        top: 80px;
+        right: 15px;
+        padding: 10px 20px;
+        font-size: 13px;
+      }
+
+      /* View toggle */
+      .bottom-toggle {
+        bottom: 20px;
+        width: 90%;
+        max-width: 300px;
+        gap: 10px;
+      }
+
+      .bottom-toggle button {
+        padding: 12px 20px;
+        font-size: 13px;
+        flex: 1;
+        min-width: auto;
+      }
+
+      /* Zoom controls */
+      .zoom-controls {
+        bottom: 100px;
+        right: 15px;
+      }
+
+      .zoom-btn {
+        width: 45px;
+        height: 45px;
+        font-size: 20px;
+      }
+
+      /* Exit building button */
+      #exitBuildingBtn {
+        bottom: 150px;
+        left: 15px;
+        padding: 10px 20px;
+        font-size: 13px;
+      }
+
+      /* Pin items */
+      .pin-item {
+        padding: 10px 12px;
+      }
+
+      .pin-name {
+        font-size: 13px;
+      }
+
+      /* Card content */
+      .card-header {
+        padding: 12px 15px 8px 15px;
+      }
+
+      .card-content {
+        padding: 12px 15px 15px 15px;
+      }
+
+      .card-description {
+        font-size: 12px;
+        padding: 10px;
+      }
+
+      .card-button,
+      .card-vr-button {
+        padding: 12px;
+        font-size: 13px;
+      }
+    }
+
+    @media (max-width: 480px) {
+
+      /* Further mobile adjustments */
+      .loading-card {
+        padding: 30px;
+      }
+
+      .loading-card img {
+        width: 120px;
+      }
+
+      .loading-card h2 {
+        font-size: 18px;
+      }
+
+      .top-bar {
+        height: 55px;
+      }
+
+      .top-bar h1 {
+        font-size: 20px;
+      }
+
+      .top-bar span {
+        font-size: 12px;
+      }
+
+      .bottom-toggle {
+        padding: 4px;
+        gap: 5px;
+      }
+
+      .bottom-toggle button {
+        padding: 10px 15px;
+        font-size: 12px;
+      }
+
+      .control-btn {
+        top: 70px;
+        padding: 8px 16px;
+        font-size: 12px;
+      }
+
+      .zoom-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
+      }
+    }
+
+    /* ================= VR MODE STYLES ================= */
+    .vr-mode .top-bar,
+    .vr-mode .bottom-toggle,
+    .vr-mode .zoom-controls,
+    .vr-mode .control-btn,
+    .vr-mode #exitBuildingBtn,
+    .vr-mode .help-button {
+      display: none !important;
+    }
+
+    body.vr-mode #listPinsBtn,
+    body.vr-mode #btn3D,
+    body.vr-mode #btn2D,
+    body.vr-mode #zoomIn,
+    body.vr-mode #zoomOut,
+    body.vr-mode #resetZoom,
+    body.vr-mode #exitBuildingBtn {
+      display: none !important;
+    }
+
+    .vr-ui-element {
+      cursor: pointer;
+    }
+
+    .vr-help {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      z-index: 10000;
+      text-align: center;
+      max-width: 400px;
+    }
+
+    .vr-help h3 {
+      color: #ea2f1c;
+      margin-bottom: 15px;
+    }
+
+    .vr-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 15px 0;
+    }
+
+    .vr-control-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 5px;
+    }
+
+    .vr-control-icon {
+      width: 30px;
+      height: 30px;
+      background: #ea2f1c;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .controller-line {
+      pointer-events: none;
+    }
+
+    .gaze-indicator {
+      pointer-events: none;
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+
+  <!-- LOADING -->
+  <div id="loadingScreen">
+    <div class="loading-card">
+      <img src="Assets/ELGIEQUIP.png" alt="ELGi Logo">
+      <h2>ELGi Industrial Plant</h2>
+      <div class="spinner"></div>
+      <span>Preparing 3D environment...</span>
+    </div>
+  </div>
+
+  <div id="container3D"></div>
+
+  <!-- HELP BUTTON -->
+  <div class="help-button" id="helpButton">
+    <i class="fas fa-question"></i>
+  </div>
+
+  <div class="top-bar">
+    <h1>ELGI</h1>
+    <span>VR TOUR PROJECT</span>
+  </div>
+
+  <!-- HELP TUTORIAL -->
+  <div class="tutorial-overlay" id="tutorialOverlay">
+    <div class="tutorial-container">
+      <div class="tutorial-header">
+        <h2>How to Use ELGi VR Tour</h2>
+        <button class="close-tutorial" id="closeTutorial">×</button>
+      </div>
+      <div class="tutorial-content">
+        <div class="tutorial-step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h3>Navigate the 3D Model</h3>
+            <p>Click and drag to rotate the view. Use the mouse wheel or pinch to zoom in/out. Drag with right-click to
+              pan.</p>
+          </div>
+        </div>
+        <div class="tutorial-step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h3>Explore Locations</h3>
+            <p>Click on any <i class="fas fa-map-pin" style="color: #ea2f1c;"></i> pin to view details about that
+              location. The information card will appear with photos and descriptions.</p>
+          </div>
+        </div>
+        <div class="tutorial-step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h3>View All Pins</h3>
+            <p>Click "List of Pins" button to see all available locations. Click any pin in the list to navigate
+              directly to it.</p>
+          </div>
+        </div>
+        <div class="tutorial-step">
+          <div class="step-number">4</div>
+          <div class="step-content">
+            <h3>Switch Views</h3>
+            <p>Use the toggle at the bottom to switch between 3D view and Top view for different perspectives.</p>
+          </div>
+        </div>
+        <div class="tutorial-step">
+          <div class="step-number">5</div>
+          <div class="step-content">
+            <h3>Explore Buildings</h3>
+            <p>Click on building pins to enter and explore internal sections. Use "Exit Building" to return to the main
+              view.</p>
+          </div>
+        </div>
+        <div class="tutorial-step">
+          <div class="step-number">6</div>
+          <div class="step-content">
+            <h3>Zoom Controls</h3>
+            <p>Use the + and - buttons for precise zoom control, or the reset button to return to default view.</p>
+          </div>
+        </div>
+      </div>
+      <div class="tutorial-footer">
+        <button id="gotItButton">Got It, Let's Start!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXIT BUILDING BUTTON -->
+  <button id="exitBuildingBtn">
+    <i class="fas fa-sign-out-alt"></i> Exit Building
+  </button>
+
+  <!-- SINGLE CONTROL BUTTON -->
+  <button id="listPinsBtn" class="control-btn">
+    <i class="fas fa-list"></i> List of Pins
+  </button>
+
+  <!-- AUTO NAVIGATE BUTTON -->
+  <button id="autoNavBtn" class="control-btn-auto">
+    <i class="fas fa-play"></i> Auto Navigate
+  </button>
+
+
+  <div class="bottom-toggle">
+    <button id="btn3D" class="active">3D View</button>
+    <button id="btn2D">Top View</button>
+  </div>
+
+  <!-- ZOOM CONTROLS -->
+  <div class="zoom-controls" id="zoomControls">
+    <button class="zoom-btn" id="zoomIn">+</button>
+    <button class="zoom-btn" id="zoomOut">-</button>
+    <button class="zoom-btn reset" id="resetZoom" title="Reset View">
+      <i class="fas fa-sync-alt"></i>
+    </button>
+  </div>
+
+  <!-- INFO CARD -->
+  <div id="infoCard">
+    <button class="close-button" id="closeCard">×</button>
+
+    <div class="card-banner" id="placeBanner">
+    </div>
+
+    <div class="card-header">
+      <div class="card-logo">
+        <span>ELGI</span>
+      </div>
+      <div class="card-title">
+        <h3 id="placeTitle">ELGI DID</h3>
+        <p id="placeSubtitle">Digital Innovation Dojo</p>
+      </div>
+    </div>
+
+    <div class="card-content">
+      <p class="card-description" id="placeDesc">
+        Digital Innovation Dojo primary entrance to the assembly unit featuring automated production lines for
+        industrial compressors.
+      </p>
+
+      <button class="card-button" id="actionButton">
+        <i class="fas fa-door-open"></i> Enter Building
+      </button>
+    </div>
+  </div>
+
+  <!-- PIN MANAGEMENT PANEL -->
+  <div class="pin-manager" id="pinManager">
+    <div class="pin-manager-header">
+      <h3 id="pinManagerTitle">Pin Locations</h3>
+      <button class="close-manager" id="closeManager">×</button>
+    </div>
+    <div class="pin-search-container">
+      <i class="fas fa-search pin-search-icon"></i>
+      <input type="text" id="pinSearchInput" placeholder="Search by ID or name...">
+    </div>
+    <div class="pin-list-container" id="pinListContainer">
+      <div class="pin-list" id="pinList">
+      </div>
+    </div>
+    <div class="pin-count" id="pinCount">14 Pins Available</div>
+  </div>
+
+  <script>
+    // ================= THREE.JS INITIALIZATION =================
+    class DeviceDetector {
+      constructor() {
+        this.isMobile = this.detectMobile();
+        this.isTablet = this.detectTablet();
+        this.isDesktop = !this.isMobile && !this.isTablet;
+        this.touchDevice = this.isTouchDevice();
+        this.orientation = this.getOrientation();
+
+        this.init();
+      }
+
+      detectMobile() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+          (window.innerWidth <= 768);
+      }
+
+      detectTablet() {
+        return (window.innerWidth > 768 && window.innerWidth <= 1024) ||
+          /iPad|Tablet|Android(?!.*Mobile)/i.test(navigator.userAgent);
+      }
+
+      isTouchDevice() {
+        return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      }
+
+      getOrientation() {
+        return window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+      }
+
+      init() {
+        const bodyClass = document.body.classList;
+        bodyClass.add(this.isMobile ? 'mobile' : 'desktop');
+        if (this.isTouchDevice()) bodyClass.add('touch-device');
+
+        console.log(`📱 Device: ${this.isMobile ? 'Mobile' : this.isTablet ? 'Tablet' : 'Desktop'}`);
+        console.log(`👆 Touch: ${this.touchDevice}`);
+        console.log(`📐 Orientation: ${this.orientation}`);
+        console.log(`📱 Screen: ${window.innerWidth}x${window.innerHeight}`);
+
+        window.addEventListener('resize', () => {
+          this.orientation = this.getOrientation();
+          console.log(`📐 Orientation changed: ${this.orientation}`);
+        });
+      }
+
+      getControlsForDevice() {
+        if (this.isMobile) {
+          return {
+            dampingFactor: 0.05,
+            autoRotateSpeed: 0.2,
+            enablePan: true,
+            enableRotate: true,
+            enableZoom: true,
+            panSpeed: 0.8,
+            rotateSpeed: 0.8,
+            zoomSpeed: 0.8
+          };
+        } else if (this.isTablet) {
+          return {
+            dampingFactor: 0.07,
+            autoRotateSpeed: 0.25,
+            enablePan: true,
+            enableRotate: true,
+            enableZoom: true,
+            panSpeed: 1.0,
+            rotateSpeed: 1.0,
+            zoomSpeed: 1.0
+          };
+        } else {
+          return {
+            dampingFactor: 0.1,
+            autoRotateSpeed: 0.3,
+            enablePan: true,
+            enableRotate: true,
+            enableZoom: true,
+            panSpeed: 1.2,
+            rotateSpeed: 1.2,
+            zoomSpeed: 1.2
+          };
+        }
+      }
+    }
+
+    class SoundManager {
+      constructor() {
+        console.log('🔊 Sound Manager initialized');
+      }
+
+      playSound() { }
+      playClick() { }
+      playButton() { }
+      playPin() { }
+      playHover() { }
+      playSuccess() { }
+      playError() { }
+      setVolume() { }
+      toggle() { }
+    }
+
+    class TutorialManager {
+      constructor() {
+        this.storageKey = 'elgi_vr_tutorial_seen';
+        this.overlay = document.getElementById('tutorialOverlay');
+        this.helpButton = document.getElementById('helpButton');
+        this.closeButton = document.getElementById('closeTutorial');
+        this.gotItButton = document.getElementById('gotItButton');
+
+        this.init();
+      }
+
+      init() {
+        const tutorialSeen = localStorage.getItem(this.storageKey);
+
+        setTimeout(() => {
+          this.showTutorial();
+        }, 1000);
+
+        // Setup event listeners
+        this.helpButton.addEventListener('click', () => {
+          this.showTutorial();
+        });
+
+        this.closeButton.addEventListener('click', () => {
+          this.hideTutorial();
+        });
+
+        // FIXED: Add event listener for "Got It, Let's Start!" button
+        this.gotItButton.addEventListener('click', () => {
+          this.hideTutorial();
+          this.startSingleCameraAnimation();
+        });
+
+        this.overlay.addEventListener('click', (e) => {
+          if (e.target === this.overlay) {
+            this.hideTutorial();
+          }
+        });
+
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && this.overlay.classList.contains('active')) {
+            this.hideTutorial();
+          }
+        });
+      }
+
+      showTutorial() {
+        this.overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      }
+
+      hideTutorial() {
+        this.overlay.classList.remove('active');
+        document.body.style.overflow = '';
+
+        localStorage.setItem(this.storageKey, 'true');
+
+        this.showToast('Tutorial closed. Click the ? button anytime for help.', 'top');
+      }
+
+      showUIElements() {
+        // Show all UI elements using CSS transitions (1.5s)
+        const uiSelectors = [
+          '.top-bar',
+          '.help-button',
+          '#autoNavBtn',
+          '#listPinsBtn',
+          '.bottom-toggle',
+          '#zoomControls'
+        ];
+
+        uiSelectors.forEach(selector => {
+          const el = document.querySelector(selector);
+          if (el) el.classList.add('visible');
+        });
+      }
+
+      startSingleCameraAnimation() {
+        if (!modelLoaded || cinematicAnimationStarted) return;
+
+        cinematicAnimationStarted = true;
+        console.log("🎬 Starting cinematic fly-in...");
+
+        // Enable audio
+        audioPlayer.play('audio1').catch(err => console.warn('Audio1 playback failed:', err));
+
+        // Animate from current Top View to Default View
+        gsap.to(camera.position, {
+          duration: 2.5,
+          x: defaultCam.position.x,
+          y: defaultCam.position.y,
+          z: defaultCam.position.z,
+          ease: "power2.inOut",
+          onComplete: () => {
+            console.log("✅ Cinematic intro complete");
+
+            // Enable controls
+            controls.enabled = true;
+            controls.autoRotate = true;
+
+            // Reveal UI
+            this.showUIElements();
+          }
+        });
+
+        // Sync target animation
+        gsap.to(controls.target, {
+          duration: 2.5,
+          x: defaultCam.target.x,
+          y: defaultCam.target.y,
+          z: defaultCam.target.z,
+          ease: "power2.inOut",
+          onUpdate: () => {
+            controls.update();
+          }
+        });
+      }
+
+      showToast(message, position = 'top') {
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+      position: fixed;
+      ${position === 'top' ? 'top: 100px;' : 'bottom: 20px;'}
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ea2f1c;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 30px;
+      z-index: 10000;
+      font-size: 14px;
+      border: 2px solid #000000;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+      animation: fadeInUp 0.3s ease, fadeOutDown 0.3s ease 2.7s forwards;
+      text-align: center;
+      min-width: 300px;
+      max-width: 80%;
+    `;
+
+        const style = document.createElement('style');
+        style.textContent = `
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translate(-50%, ${position === 'top' ? '-20px' : '20px'}); }
+        to { opacity: 1; transform: translate(-50%, 0); }
+      }
+      @keyframes fadeOutDown {
+        from { opacity: 1; transform: translate(-50%, 0); }
+        to { opacity: 0; transform: translate(-50%, ${position === 'top' ? '-20px' : '20px'}); }
+      }
+    `;
+        document.head.appendChild(style);
+
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+          if (toast.parentNode) {
+            toast.remove();
+          }
+          if (style.parentNode) {
+            style.remove();
+          }
+        }, 3000);
+      }
+    }
+
+    class ImageManager {
+      constructor() {
+        this.images = new Map();
+        this.loadingQueue = [];
+        this.currentImageIndex = -1;
+        this.totalImages = 43;
+        this.imageBasePath = './images/';
+        this.bannerFallback = null;
+
+        this.createBannerFallback();
+      }
+
+      createBannerFallback() {
+        const fallbackDiv = document.createElement('div');
+        fallbackDiv.className = 'banner-fallback';
+        fallbackDiv.innerHTML = '<i class="fas fa-image"></i>';
+        this.bannerFallback = fallbackDiv;
+      }
+
+      normalizeImageKey(imageKey) {
+        if (!imageKey) return 'banner';
+
+        let key = imageKey.toString();
+        key = key.replace(/\.(jpg|jpeg|png)$/i, '');
+
+        return key;
+      }
+
+      getImagePath(imageKey) {
+        const normalizedKey = this.normalizeImageKey(imageKey);
+
+        if (normalizedKey === 'banner') {
+          return `${this.imageBasePath}banner.png`;
+        }
+
+        const numKey = parseInt(normalizedKey);
+        if (!isNaN(numKey) && numKey >= 1 && numKey <= this.totalImages) {
+          return `${this.imageBasePath}${numKey}.jpg`;
+        }
+
+        return `${this.imageBasePath}${normalizedKey}.jpg`;
+      }
+
+      loadImage(imageKey) {
+        return new Promise((resolve, reject) => {
+          const normalizedKey = this.normalizeImageKey(imageKey);
+
+          if (this.images.has(normalizedKey)) {
+            resolve(this.images.get(normalizedKey));
+            return;
+          }
+
+          const img = new Image();
+          const imagePath = this.getImagePath(imageKey);
+
+          img.onload = () => {
+            console.log(`✅ Image loaded: ${normalizedKey} from ${imagePath}`);
+            this.images.set(normalizedKey, img);
+            resolve(img);
+          };
+
+          img.onerror = () => {
+            console.warn(`⚠️ Failed to load image: ${normalizedKey} from ${imagePath}`);
+            const bannerImg = new Image();
+            bannerImg.src = './images/banner.png';
+            bannerImg.onload = () => {
+              this.images.set('banner', bannerImg);
+              resolve(bannerImg);
+            };
+            bannerImg.onerror = () => {
+              console.warn(`⚠️ Banner fallback also failed`);
+              resolve(this.bannerFallback);
+            };
+          };
+
+          console.log(`🔄 Loading image: ${imagePath}`);
+          img.src = imagePath;
+        });
+      }
+
+      async loadForDisplay(imageKey) {
+        const bannerDiv = document.getElementById('placeBanner');
+
+        bannerDiv.innerHTML = '';
+
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.className = 'banner-loading';
+        loadingIndicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading image...';
+        bannerDiv.appendChild(loadingIndicator);
+
+        try {
+          const normalizedKey = this.normalizeImageKey(imageKey);
+
+          const image = await this.loadImage(imageKey);
+
+          const numKey = parseInt(normalizedKey);
+          if (!isNaN(numKey)) {
+            this.currentImageIndex = numKey;
+            this.preloadAdjacentImages(numKey);
+          }
+
+          bannerDiv.innerHTML = '';
+          bannerDiv.appendChild(image);
+
+          if (image instanceof HTMLImageElement) {
+            image.alt = 'Pin Image';
+          }
+
+          return image;
+        } catch (error) {
+          console.error('Error loading image:', error);
+          bannerDiv.innerHTML = '';
+          bannerDiv.appendChild(this.bannerFallback);
+          return this.bannerFallback;
+        }
+      }
+
+      preloadAdjacentImages(currentIndex) {
+        const indicesToPreload = [];
+
+        for (let i = 1; i <= 2; i++) {
+          const prevIndex = currentIndex - i;
+          if (prevIndex >= 1) {
+            indicesToPreload.push(prevIndex.toString());
+          }
+        }
+
+        for (let i = 1; i <= 2; i++) {
+          const nextIndex = currentIndex + i;
+          if (nextIndex <= this.totalImages) {
+            indicesToPreload.push(nextIndex.toString());
+          }
+        }
+
+        indicesToPreload.push('banner');
+
+        this.loadInBackground(indicesToPreload);
+      }
+
+      async loadInBackground(imageKeys) {
+        for (const key of imageKeys) {
+          if (!this.images.has(this.normalizeImageKey(key))) {
+            this.loadImage(key).catch(err =>
+              console.warn(`Background load failed for ${key}:`, err)
+            );
+          }
+        }
+      }
+
+      async preloadCriticalImages() {
+        const criticalImages = [
+          'banner',
+          '1',
+          '2',
+          '3',
+          '4',
+          '5'
+        ];
+
+        console.log('🔄 Preloading critical images...');
+        await Promise.all(
+          criticalImages.map(key =>
+            this.loadImage(key)
+              .catch(err => console.warn(`Critical image ${key} failed:`, err))
+          )
+        );
+        console.log('✅ Critical images preloaded');
+      }
+
+      clearCache() {
+        this.images.clear();
+      }
+    }
+
+    class AudioPlayer {
+      constructor() {
+        this.audioElements = new Map();
+        this.audioBasePath = './audio/';
+        this.currentlyPlaying = null;
+        this.isPlaying = false;
+        this.volume = 0.7;
+      }
+
+      preloadAudio(audioKey) {
+        return new Promise((resolve, reject) => {
+          const normalizedKey = this.normalizeAudioKey(audioKey);
+
+          if (this.audioElements.has(normalizedKey)) {
+            resolve(this.audioElements.get(normalizedKey));
+            return;
+          }
+
+          const audio = new Audio();
+          const audioPath = this.getAudioPath(audioKey);
+
+          audio.preload = 'auto';
+          audio.volume = this.volume;
+
+          audio.addEventListener('canplaythrough', () => {
+            console.log(`✅ Audio loaded: ${normalizedKey} from ${audioPath}`);
+            this.audioElements.set(normalizedKey, audio);
+            resolve(audio);
+          }, { once: true });
+
+          audio.addEventListener('error', (e) => {
+            console.warn(`⚠️ Failed to load audio: ${normalizedKey} from ${audioPath}`, e);
+            reject(new Error(`Failed to load audio: ${normalizedKey}`));
+          }, { once: true });
+
+          console.log(`🔄 Loading audio: ${audioPath}`);
+          audio.src = audioPath;
+          audio.load();
+        });
+      }
+
+      normalizeAudioKey(audioKey) {
+        if (!audioKey) return null;
+
+        let key = audioKey.toString();
+        key = key.replace(/\.(mpeg|wav|ogg)$/i, '');
+
+        return key;
+      }
+
+      getAudioPath(audioKey) {
+        const normalizedKey = this.normalizeAudioKey(audioKey);
+
+        if (normalizedKey === 'audio1') {
+          return `${this.audioBasePath}audio1.mpeg`;
+        } else if (normalizedKey === 'audio2') {
+          return `${this.audioBasePath}audio2.mpeg`;
+        }
+
+        return `${this.audioBasePath}${normalizedKey}.mpeg`;
+      }
+
+      async play(audioKey) {
+        try {
+          this.stop();
+
+          const audio = await this.preloadAudio(audioKey);
+
+          this.currentlyPlaying = audio;
+          this.isPlaying = true;
+
+          audio.currentTime = 0;
+          audio.volume = this.volume;
+
+          const playPromise = audio.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(error => {
+              console.warn('Audio playback failed:', error);
+              this.isPlaying = false;
+              this.currentlyPlaying = null;
+            });
+          }
+
+          audio.addEventListener('ended', () => {
+            this.isPlaying = false;
+            this.currentlyPlaying = null;
+          }, { once: true });
+
+          console.log(`🔊 Playing audio: ${audioKey}`);
+          return audio;
+        } catch (error) {
+          console.error('Error playing audio:', error);
+          return null;
+        }
+      }
+
+      stop() {
+        if (this.currentlyPlaying) {
+          this.currentlyPlaying.pause();
+          this.currentlyPlaying.currentTime = 0;
+          this.currentlyPlaying = null;
+          this.isPlaying = false;
+        }
+      }
+
+      pause() {
+        if (this.currentlyPlaying) {
+          this.currentlyPlaying.pause();
+          this.isPlaying = false;
+        }
+      }
+
+      resume() {
+        if (this.currentlyPlaying && !this.isPlaying) {
+          this.currentlyPlaying.play();
+          this.isPlaying = true;
+        }
+      }
+
+      setVolume(level) {
+        this.volume = Math.max(0, Math.min(1, level));
+
+        if (this.currentlyPlaying) {
+          this.currentlyPlaying.volume = this.volume;
+        }
+
+        this.audioElements.forEach(audio => {
+          audio.volume = this.volume;
+        });
+      }
+
+      async preloadAllAudio() {
+        const audioFiles = ['audio1', 'audio2'];
+
+        console.log('🔄 Preloading all audio files...');
+
+        try {
+          await Promise.all(
+            audioFiles.map(key =>
+              this.preloadAudio(key)
+                .catch(err => console.warn(`Audio ${key} preload failed:`, err))
+            )
+          );
+          console.log('✅ All audio files preloaded');
+        } catch (error) {
+          console.error('Error preloading audio:', error);
+        }
+      }
+    }
+
+    const deviceDetector = new DeviceDetector();
+    const soundManager = new SoundManager();
+    const audioPlayer = new AudioPlayer();
+    let tutorialManager;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0xf5f5f5, 10, 50);
+
+    const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.setClearColor(0xf5f5f5);
+    renderer.xr.enabled = true;
+    document.getElementById("container3D").appendChild(renderer.domElement);
+
+    let controllers = [];
+    let controllerLines = [];
+    let vrSession = null;
+
+    function setupVRControllers() {
+      for (let i = 0; i < 2; i++) {
+        const controller = renderer.xr.getController(i);
+        controller.addEventListener('selectstart', onSelectStart);
+        controller.addEventListener('selectend', onSelectEnd);
+        scene.add(controller);
+        controllers.push(controller);
+
+        const geometry = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, 0, 0),
+          new THREE.Vector3(0, 0, -10)
+        ]);
+
+        const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({
+          color: 0xea2f1c,
+          opacity: 0.8,
+          transparent: true,
+          linewidth: 2
+        }));
+        line.scale.z = 10;
+        line.visible = false;
+        line.name = 'controller-line';
+        controller.add(line);
+        controllerLines.push(line);
+
+        const controllerModel = new THREE.Mesh(
+          new THREE.BoxGeometry(0.05, 0.05, 0.1),
+          new THREE.MeshBasicMaterial({ color: 0xea2f1c })
+        );
+        controllerModel.position.z = -0.05;
+        controllerModel.name = 'controller-model';
+        controller.add(controllerModel);
+      }
+    }
+
+    function onSelectStart(event) {
+      const controller = event.target;
+      const intersections = getControllerIntersections(controller);
+
+      if (intersections.length > 0) {
+        const intersection = intersections[0];
+
+        if (intersection.object.userData.isUI) {
+          handleUIInteraction(intersection.object);
+        }
+        else if (intersection.object.userData.title) {
+          handlePinClick(intersection.object);
+        }
+
+        const line = controller.children.find(child => child.name === 'controller-line');
+        if (line) {
+          gsap.to(line.material, {
+            opacity: 1,
+            duration: 0.1,
+            yoyo: true,
+            repeat: 1
+          });
+        }
+      }
+    }
+
+    function onSelectEnd(event) {
+    }
+
+    function getControllerIntersections(controller) {
+      const tempMatrix = new THREE.Matrix4();
+      tempMatrix.identity().extractRotation(controller.matrixWorld);
+
+      const raycaster = new THREE.Raycaster();
+      raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+      raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+      const interactiveObjects = getAllInteractiveObjects();
+
+      const intersections = raycaster.intersectObjects(interactiveObjects, true);
+
+      return intersections;
+    }
+
+    function getAllInteractiveObjects() {
+      const interactiveObjects = [];
+
+      const currentPins = isInChildView ? childPins : pins;
+      currentPins.forEach(pin => {
+        if (pin.pinObject && pin.pinObject.visible) {
+          interactiveObjects.push(pin.pinObject);
+        }
+      });
+
+      scene.traverse(object => {
+        if (object.userData && object.userData.isUI) {
+          interactiveObjects.push(object);
+        }
+      });
+
+      return interactiveObjects;
+    }
+
+    let gazeTimer = null;
+    let gazeTarget = null;
+    let gazeProgress = 0;
+    let gazeIndicator = null;
+    let gazeProgressRing = null;
+
+    function setupGazeInteraction() {
+      const geometry = new THREE.RingGeometry(0.005, 0.01, 32);
+      const material = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        opacity: 0.8,
+        transparent: true,
+        side: THREE.DoubleSide
+      });
+
+      gazeIndicator = new THREE.Mesh(geometry, material);
+      gazeIndicator.position.z = -2;
+      gazeIndicator.name = 'gaze-indicator';
+      camera.add(gazeIndicator);
+
+      const progressGeometry = new THREE.RingGeometry(0.012, 0.015, 32);
+      const progressMaterial = new THREE.MeshBasicMaterial({
+        color: 0xea2f1c,
+        opacity: 0.5,
+        transparent: true,
+        side: THREE.DoubleSide
+      });
+
+      gazeProgressRing = new THREE.Mesh(progressGeometry, progressMaterial);
+      gazeProgressRing.position.z = -1.99;
+      gazeProgressRing.visible = false;
+      gazeProgressRing.name = 'gaze-progress-ring';
+      camera.add(gazeProgressRing);
+
+      setInterval(checkGazeInteraction, 100);
+    }
+
+    function checkGazeInteraction() {
+      if (!vrSession) return;
+
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+
+      const interactiveObjects = getAllInteractiveObjects();
+      const intersections = raycaster.intersectObjects(interactiveObjects, true);
+
+      if (intersections.length > 0) {
+        const target = intersections[0].object;
+
+        if (gazeTarget !== target) {
+          gazeTarget = target;
+          gazeProgress = 0;
+          clearTimeout(gazeTimer);
+
+          gazeTimer = setTimeout(() => {
+            if (gazeTarget.userData.isUI) {
+              handleUIInteraction(gazeTarget);
+            } else if (gazeTarget.userData.title) {
+              handlePinClick(gazeTarget);
+            }
+            gazeProgress = 0;
+            updateGazeProgress();
+          }, 1500);
+        }
+
+        gazeProgress += 100;
+        updateGazeProgress();
+      } else {
+        gazeTarget = null;
+        gazeProgress = 0;
+        clearTimeout(gazeTimer);
+        updateGazeProgress();
+      }
+    }
+
+    function updateGazeProgress() {
+      if (gazeProgressRing) {
+        const progress = gazeProgress / 1500;
+        gazeProgressRing.visible = progress > 0;
+
+        if (progress > 0) {
+          gazeProgressRing.material.opacity = 0.3 + progress * 0.7;
+          gazeProgressRing.scale.set(1 + progress * 0.2, 1 + progress * 0.2, 1);
+        }
+      }
+    }
+
+    let ui3DElements = [];
+
+    function setupInteractiveUI() {
+      ui3DElements.forEach(element => {
+        scene.remove(element);
+      });
+      ui3DElements = [];
+
+      createVRControlPanel();
+
+      create3DButton('List Pins', 'listPinsBtn', { x: 2, y: 1.5, z: -3 });
+      create3DButton('3D View', 'btn3D', { x: 2, y: 1, z: -3 });
+      create3DButton('Top View', 'btn2D', { x: 2, y: 0.5, z: -3 });
+      create3DButton('Zoom In', 'zoomIn', { x: 2, y: 0, z: -3 });
+      create3DButton('Zoom Out', 'zoomOut', { x: 2, y: -0.5, z: -3 });
+      create3DButton('Reset View', 'resetZoom', { x: 2, y: -1, z: -3 });
+      create3DButton('Exit Building', 'exitBuildingBtn', { x: -2, y: 1.5, z: -3 });
+    }
+
+    function createVRControlPanel() {
+      const panelGeometry = new THREE.PlaneGeometry(1.5, 2);
+      const panelMaterial = new THREE.MeshBasicMaterial({
+        color: 0xea2f1c,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.9
+      });
+
+      const controlPanel = new THREE.Mesh(panelGeometry, panelMaterial);
+      controlPanel.position.set(0, 1.5, -3);
+      controlPanel.rotation.y = 0;
+
+      controlPanel.userData = {
+        isUI: true,
+        name: 'VR Control Panel',
+        isPanel: true
+      };
+
+      scene.add(controlPanel);
+      ui3DElements.push(controlPanel);
+
+      const titleCanvas = document.createElement('canvas');
+      titleCanvas.width = 512;
+      titleCanvas.height = 128;
+      const ctx = titleCanvas.getContext('2d');
+
+      ctx.fillStyle = '#ea2f1c';
+      ctx.fillRect(0, 0, titleCanvas.width, titleCanvas.height);
+
+      ctx.font = 'bold 40px Arial';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('VR CONTROLS', titleCanvas.width / 2, titleCanvas.height / 2);
+
+      const titleTexture = new THREE.CanvasTexture(titleCanvas);
+      const titleGeometry = new THREE.PlaneGeometry(1.2, 0.3);
+      const titleMaterial = new THREE.MeshBasicMaterial({
+        map: titleTexture,
+        side: THREE.DoubleSide,
+        transparent: true
+      });
+
+      const titleMesh = new THREE.Mesh(titleGeometry, titleMaterial);
+      titleMesh.position.set(0, 0.8, 0.01);
+      controlPanel.add(titleMesh);
+
+      const instructions = [
+        'Use Trigger to Click',
+        'Gaze for 1.5s to Select',
+        'Move with Thumbsticks'
+      ];
+
+      instructions.forEach((text, index) => {
+        const instructionCanvas = document.createElement('canvas');
+        instructionCanvas.width = 512;
+        instructionCanvas.height = 64;
+        const instrCtx = instructionCanvas.getContext('2d');
+
+        instrCtx.fillStyle = '#ffffff';
+        instrCtx.font = '20px Arial';
+        instrCtx.textAlign = 'center';
+        instrCtx.textBaseline = 'middle';
+        instrCtx.fillText(text, instructionCanvas.width / 2, instructionCanvas.height / 2);
+
+        const instructionTexture = new THREE.CanvasTexture(instructionCanvas);
+        const instructionGeometry = new THREE.PlaneGeometry(1, 0.15);
+        const instructionMaterial = new THREE.MeshBasicMaterial({
+          map: instructionTexture,
+          side: THREE.DoubleSide,
+          transparent: true
+        });
+
+        const instructionMesh = new THREE.Mesh(instructionGeometry, instructionMaterial);
+        instructionMesh.position.set(0, 0.5 - (index * 0.25), 0.01);
+        controlPanel.add(instructionMesh);
+      });
+    }
+
+    function create3DButton(label, buttonId, position) {
+      const buttonGeometry = new THREE.PlaneGeometry(0.4, 0.15);
+      const buttonMaterial = new THREE.MeshBasicMaterial({
+        color: 0xea2f1c,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8
+      });
+
+      const button3D = new THREE.Mesh(buttonGeometry, buttonMaterial);
+      button3D.position.set(position.x, position.y, position.z);
+      button3D.name = `vr-button-${buttonId}`;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#ea2f1c';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.font = 'bold 20px Arial';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, canvas.width / 2, canvas.height / 2);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const textGeometry = new THREE.PlaneGeometry(0.35, 0.1);
+      const textMaterial = new THREE.MeshBasicMaterial({
+        map: texture,
+        side: THREE.DoubleSide,
+        transparent: true
+      });
+
+      const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+      textMesh.position.z = 0.01;
+      button3D.add(textMesh);
+
+      button3D.userData = {
+        isUI: true,
+        htmlElementId: buttonId,
+        label: label,
+        onClick: () => {
+          const htmlButton = document.getElementById(buttonId);
+          if (htmlButton) {
+            htmlButton.click();
+          }
+        }
+      };
+
+      scene.add(button3D);
+      ui3DElements.push(button3D);
+      return button3D;
+    }
+
+    function getUIObjects() {
+      return ui3DElements;
+    }
+
+    function handleUIInteraction(uiObject) {
+      console.log('UI Interaction:', uiObject.userData);
+
+      if (uiObject.userData.onClick) {
+        uiObject.userData.onClick();
+      } else if (uiObject.userData.htmlElementId) {
+        const htmlElement = document.getElementById(uiObject.userData.htmlElementId);
+        if (htmlElement) {
+          htmlElement.click();
+        }
+      }
+
+      gsap.to(uiObject.scale, {
+        x: 1.2,
+        y: 1.2,
+        z: 1.2,
+        duration: 0.1,
+        yoyo: true,
+        repeat: 1
+      });
+
+      if (vrSession && vrSession.inputSources && vrSession.inputSources[0]) {
+        const inputSource = vrSession.inputSources[0];
+        if (inputSource.hapticActuators && inputSource.hapticActuators[0]) {
+          inputSource.hapticActuators[0].pulse(0.5, 100);
+        }
+      }
+    }
+
+    function setupVRButton() {
+      if (navigator.xr) {
+        navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
+          if (supported) {
+            const vrButton = VRButton.createButton(renderer);
+            vrButton.style.position = 'fixed';
+            vrButton.style.bottom = '20px';
+            vrButton.style.left = '20px';
+            vrButton.style.zIndex = '1000';
+            vrButton.innerHTML = '<i class="fas fa-vr-cardboard"></i> Enter VR';
+            document.body.appendChild(vrButton);
+
+            renderer.xr.addEventListener('sessionstart', () => {
+              console.log('VR session started');
+              vrSession = renderer.xr.getSession();
+
+              controllerLines.forEach(line => {
+                line.visible = true;
+              });
+
+              document.body.classList.add('vr-mode');
+
+              setupInteractiveUI();
+
+              showVRHelp();
+            });
+
+            renderer.xr.addEventListener('sessionend', () => {
+              console.log('VR session ended');
+              vrSession = null;
+
+              controllerLines.forEach(line => {
+                line.visible = false;
+              });
+
+              document.body.classList.remove('vr-mode');
+
+              ui3DElements.forEach(element => {
+                scene.remove(element);
+              });
+              ui3DElements = [];
+            });
+          }
+        });
+      }
+    }
+
+    function showVRHelp() {
+      const helpText = document.createElement('div');
+      helpText.style.cssText = `
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 15px;
+    border-radius: 10px;
+    z-index: 10000;
+    text-align: center;
+    font-family: Arial, sans-serif;
+  `;
+      helpText.innerHTML = `
+    <h3 style="color: #ea2f1c;">VR Controls</h3>
+    <p><strong>Controllers:</strong> Use trigger to click</p>
+    <p><strong>Gaze:</strong> Look at items for 1.5s to select</p>
+    <p><strong>Movement:</strong> Use thumbsticks to move</p>
+    <button onclick="this.parentElement.remove()" 
+            style="margin-top: 10px; padding: 5px 15px; background: #ea2f1c; color: white; border: none; border-radius: 5px;">
+      OK
+    </button>
+  `;
+      document.body.appendChild(helpText);
+
+      setTimeout(() => {
+        if (helpText.parentNode) {
+          helpText.remove();
+        }
+      }, 10000);
+    }
+
+    const controlsConfig = deviceDetector.getControlsForDevice();
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = controlsConfig.dampingFactor;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = controlsConfig.autoRotateSpeed;
+    controls.maxPolarAngle = Math.PI / 2.1;
+    controls.minDistance = 1.0;
+    controls.maxDistance = 5.0;
+    controls.enablePan = controlsConfig.enablePan;
+    controls.enableRotate = controlsConfig.enableRotate;
+    controls.enableZoom = controlsConfig.enableZoom;
+    controls.panSpeed = controlsConfig.panSpeed;
+    controls.rotateSpeed = controlsConfig.rotateSpeed;
+    controls.zoomSpeed = controlsConfig.zoomSpeed;
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    directionalLight.position.set(5, 15, 5);
+    directionalLight.castShadow = true;
+    scene.add(directionalLight);
+
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    fillLight.position.set(-5, 10, -5);
+    scene.add(fillLight);
+
+    const defaultCam = { position: new THREE.Vector3(), target: new THREE.Vector3() };
+    const topViewCam = { position: new THREE.Vector3(), target: new THREE.Vector3() };
+    window.isTopView = false;
+
+    let modelLoaded = false;
+    let modelCenter = new THREE.Vector3();
+    let modelSize = 1;
+    window.modelBoundingBox = new THREE.Box3();
+
+    const dracoLoader = new THREE.DRACOLoader();
+    dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+    dracoLoader.preload();
+
+    const gltfLoader = new THREE.GLTFLoader();
+    gltfLoader.setDRACOLoader(dracoLoader);
+
+    let selectedPinIndex = -1;
+    let pins = [];
+    let childPins = [];
+    window.isInChildView = false;
+    let currentParentPin = null;
+    let clickedPin = null;
+    let bounceAnimation = null;
+
+    const listPinsBtn = document.getElementById('listPinsBtn');
+    const exitBuildingBtn = document.getElementById('exitBuildingBtn');
+    const pinManager = document.getElementById('pinManager');
+    const pinManagerTitle = document.getElementById('pinManagerTitle');
+    const pinListContainer = document.getElementById('pinListContainer');
+    const pinList = document.getElementById('pinList');
+    const pinCount = document.getElementById('pinCount');
+    const closeManager = document.getElementById('closeManager');
+
+    const actionButton = document.getElementById('actionButton');
+
+    const permanentPinsData = {
+      "metadata": {
+        "exportDate": "2025-12-29T09:38:58.340Z",
+        "totalPins": 17,
+        "modelName": "ELGi Industrial Plant"
+      },
+      "pins": [
+        {
+          "id": 1,
+          "position": {
+            "x": 1.2233695236959714,
+            "y": 0.03,
+            "z": -6.528537483022164
+          },
+          "data": {
+            "title": "Main Entrance",
+            "subtitle": "ELGi DID",
+            "description": "Primary entrance to the Digital Innovation Dojo",
+            "type": "default",
+            "imageKey": "3"
+          }
+        },
+        {
+          "id": 2,
+          "position": {
+            "x": 0.8240972270858269,
+            "y": 0.03,
+            "z": -6.54150026551529
+          },
+          "data": {
+            "title": "Reception Area",
+            "subtitle": "Welcome Desk",
+            "description": "Main reception and visitor registration area",
+            "type": "default",
+            "imageKey": "1"
+          }
+        },
+        {
+          "id": 3,
+          "position": {
+            "x": 0.4352182234274265,
+            "y": 0.03,
+            "z": -6.528378096474124
+          },
+          "data": {
+            "title": "Security Check",
+            "subtitle": "Access Control",
+            "description": "Security checkpoint and access control system",
+            "type": "default",
+            "imageKey": "2"
+          }
+        },
+        {
+          "id": 4,
+          "position": {
+            "x": 0.7806905613742652,
+            "y": 0.03,
+            "z": -5.5421157563406025
+          },
+          "data": {
+            "title": "Compressor Assembly Line 1",
+            "subtitle": "Production Area",
+            "description": "Primary assembly line for industrial compressors",
+            "type": "default",
+            "imageKey": "4"
+          }
+        },
+        {
+          "id": 5,
+          "position": {
+            "x": 0.7722608617380132,
+            "y": 0.03,
+            "z": -4.4140528444766725
+          },
+          "data": {
+            "title": "Quality Control Station",
+            "subtitle": "QC Department",
+            "description": "Quality testing and inspection area",
+            "type": "default",
+            "imageKey": "5"
+          }
+        },
+        {
+          "id": 6,
+          "position": {
+            "x": 0.7722608617380132,
+            "y": 0.03,
+            "z": -3.541901274192404
+          },
+          "data": {
+            "title": "Hydraulic Press Station",
+            "subtitle": "Equipment",
+            "description": "Hydraulic press for metal forming operations",
+            "type": "default",
+            "imageKey": "6"
+          }
+        },
+        {
+          "id": 7,
+          "position": {
+            "x": 0.7722608617380132,
+            "y": 0.03,
+            "z": -2.2902897140551746
+          },
+          "data": {
+            "title": "CNC Machine Center",
+            "subtitle": "Precision Machining",
+            "description": "Computer Numerical Control machining center",
+            "type": "default",
+            "imageKey": "7"
+          }
+        },
+        {
+          "id": 8,
+          "position": {
+            "x": 0.7722608617380132,
+            "y": 0.03,
+            "z": -1.0757255574246773
+          },
+          "data": {
+            "title": "Testing Chamber",
+            "subtitle": "Performance Testing",
+            "description": "Soundproof testing chamber for compressor noise testing",
+            "type": "default",
+            "imageKey": "8"
+          }
+        },
+        {
+          "id": 9,
+          "position": {
+            "x": 0.7722608617380132,
+            "y": 0.03,
+            "z": -0.31471139810109694
+          },
+          "data": {
+            "title": "Control Room",
+            "subtitle": "Monitoring Center",
+            "description": "Central control room for monitoring production processes",
+            "type": "default",
+            "imageKey": "9"
+          }
+        },
+        {
+          "id": 10,
+          "position": {
+            "x": 0.777751776719178,
+            "y": 0.03,
+            "z": -0.00505960480591483
+          },
+          "data": {
+            "title": "Electrical Panel",
+            "subtitle": "Power Distribution",
+            "description": "Main electrical distribution panel for the production line",
+            "type": "default",
+            "imageKey": "10"
+          }
+        },
+        {
+          "id": 11,
+          "position": {
+            "x": 0.6014922331118336,
+            "y": 0.125,
+            "z": -0.0016197391634031515
+          },
+          "data": {
+            "title": "Workshop Area",
+            "subtitle": "Maintenance Department",
+            "description": "General maintenance and repair workshop",
+            "type": "default",
+            "imageKey": "11"
+          }
+        },
+        {
+          "id": 12,
+          "position": {
+            "x": -0.2652098296456663,
+            "y": 0.2031147568522731,
+            "z": -0.022737805336538332
+          },
+          "data": {
+            "title": "Finished Goods",
+            "subtitle": "Product Storage",
+            "description": "Storage area for finished compressors ready for shipment",
+            "type": "default",
+            "imageKey": "22"
+          }
+        },
+        {
+          "id": 113,
+          "position": {
+            "x": 0.25842418487015106,
+            "y": 0.38530307798098085,
+            "z": 0.14474923842966783
+          },
+          "data": {
+            "title": "Building 1",
+            "subtitle": "Main Building",
+            "description": "Click to enter and explore Building 1 interior",
+            "type": "default",
+            "hasChildren": true
+          }
+        },
+        {
+          "id": 114,
+          "position": {
+            "x": -0.99,
+            "y": 0.22,
+            "z": 0.15
+          },
+          "data": {
+            "title": "Building 2",
+            "subtitle": "West Wing",
+            "description": "Click to enter and explore Building 2 interior",
+            "type": "default",
+            "hasChildren": true
+          }
+        },
+        {
+          "id": 115,
+          "position": {
+            "x": -2.16,
+            "y": 0.22,
+            "z": 0.82
+          },
+          "data": {
+            "title": "Building 3",
+            "subtitle": "East Wing",
+            "description": "Click to enter and explore Building 3 interior",
+            "type": "default",
+            "hasChildren": true
+          }
+        },
+        {
+          "id": 13,
+          "position": {
+            "x": -0.06334451525193921,
+            "y": 0.2031147568522731,
+            "z": -0.07544366691088258
+          },
+          "data": {
+            "title": "Pin 1",
+            "subtitle": "New Location",
+            "description": "Description of this location",
+            "type": "default",
+            "imageKey": "20"
+          }
+        },
+        {
+          "id": 14,
+          "position": {
+            "x": -0.027841760734099386,
+            "y": 0.03,
+            "z": -0.24819758062183972
+          },
+          "data": {
+            "title": "Pin 2",
+            "subtitle": "New Location",
+            "description": "Description of this location",
+            "type": "default",
+            "imageKey": "21"
+          }
+        }
+      ]
+    };
+
+    const childPinsData = {
+      "building1": [
+        {
+          "pin": 15,
+          "location": { "x": 0.439463633708573, "y": 0.29451116024614985, "z": -0.04171737611930951 },
+          "data": {
+            "title": "Main Building Center",
+            "subtitle": "Central Area",
+            "description": "Central area of the main building",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "12"
+          }
+        },
+        {
+          "pin": 16,
+          "location": { "x": 0.3824911601461878, "y": 0.29451116024614985, "z": 0.012682677999454467 },
+          "data": {
+            "title": "Storage Area 1",
+            "subtitle": "Internal Section",
+            "description": "Primary storage area for raw materials",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "13"
+          }
+        },
+        {
+          "pin": 17,
+          "location": { "x": 0.32710520510356886, "y": 0.29451116024614985, "z": 0.016363448823902976 },
+          "data": {
+            "title": "Storage Area 2",
+            "subtitle": "Upper Level",
+            "description": "Upper level storage area",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "14"
+          }
+        },
+        {
+          "pin": 18,
+          "location": { "x": 0.2008239670843394, "y": 0.29451116024614985, "z": -0.036431753301580216 },
+          "data": {
+            "title": "Quality Check Area",
+            "subtitle": "Internal Section",
+            "description": "Internal quality checking station",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "15"
+          }
+        },
+        {
+          "pin": 19,
+          "location": { "x": 0.1300819189141722, "y": 0.29451116024614985, "z": -0.04283632692249148 },
+          "data": {
+            "title": "Workshop Section",
+            "subtitle": "Internal Section",
+            "description": "Internal maintenance workshop",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "16"
+          }
+        },
+        {
+          "pin": 20,
+          "location": { "x": 0.06320297992268775, "y": 0.29451116024614985, "z": -0.05272284204842875 },
+          "data": {
+            "title": "Material Handling",
+            "subtitle": "Internal Section",
+            "description": "Material handling and movement area",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "17"
+          }
+        },
+        {
+          "pin": 21,
+          "location": { "x": 0.0005411569436827579, "y": 0.29451116024614985, "z": 0.007719513181800891 },
+          "data": {
+            "title": "Control Room Annex",
+            "subtitle": "Internal Section",
+            "description": "Annex to the main control room",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "18"
+          }
+        },
+        {
+          "pin": 22,
+          "location": { "x": 0.00839171180389181, "y": 0.29451116024614985, "z": -0.08962804906111047 },
+          "data": {
+            "title": "Equipment Storage",
+            "subtitle": "Internal Section",
+            "description": "Storage area for equipment and tools",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "19"
+          }
+        }
+      ],
+      "building2": [
+        {
+          "pin": 23,
+          "location": { "x": -0.518693325305168, "y": 0.22, "z": -0.004583353414405633 },
+          "data": {
+            "title": "Storage Bay 1",
+            "subtitle": "Building 2 Section",
+            "description": "Storage bay in Building 2",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "23"
+          }
+        },
+        {
+          "pin": 24,
+          "location": { "x": -0.7122600702657584, "y": 0.22, "z": -0.021954730903915462 },
+          "data": {
+            "title": "Storage Bay 2",
+            "subtitle": "Building 2 Section",
+            "description": "Secondary storage area",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "24"
+          }
+        },
+        {
+          "pin": 25,
+          "location": { "x": -0.9353012842554332, "y": 0.22, "z": -0.044165947652509974 },
+          "data": {
+            "title": "Workshop Area",
+            "subtitle": "Building 2 Section",
+            "description": "Maintenance workshop in Building 2",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "25"
+          }
+        },
+        {
+          "pin": 26,
+          "location": { "x": -1.151850589064965, "y": 0.22, "z": -0.04981715471862083 },
+          "data": {
+            "title": "Quality Control",
+            "subtitle": "Building 2 Section",
+            "description": "Quality control station",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "26"
+          }
+        },
+        {
+          "pin": 27,
+          "location": { "x": -1.172869352895448, "y": 0.22, "z": 0.14885931949257616 },
+          "data": {
+            "title": "Equipment Room",
+            "subtitle": "Building 2 Section",
+            "description": "Equipment storage room",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "27"
+          }
+        },
+        {
+          "pin": 28,
+          "location": { "x": -1.1981412519751689, "y": 0.22, "z": 0.27832222217281277 },
+          "data": {
+            "title": "Control Center",
+            "subtitle": "Building 2 Section",
+            "description": "Control center for operations",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "28"
+          }
+        },
+        {
+          "pin": 29,
+          "location": { "x": -1.0818179105785424, "y": 0.22, "z": 0.4662850155221722 },
+          "data": {
+            "title": "Assembly Line 1",
+            "subtitle": "Building 2 Section",
+            "description": "Primary assembly line",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "31"
+          }
+        },
+        {
+          "pin": 30,
+          "location": { "x": -0.8708812806804809, "y": 0.22, "z": 0.4662398644439521 },
+          "data": {
+            "title": "Assembly Line 2",
+            "subtitle": "Building 2 Section",
+            "description": "Secondary assembly line",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "29"
+          }
+        },
+        {
+          "pin": 31,
+          "location": { "x": -0.6119026160553455, "y": 0.22, "z": 0.4344451920324889 },
+          "data": {
+            "title": "Testing Area",
+            "subtitle": "Building 2 Section",
+            "description": "Product testing area",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "30"
+          }
+        }
+      ],
+      "building3": [
+        {
+          "pin": 32,
+          "location": { "x": -1.4472379684765078, "y": 0.22, "z": -0.0476877958159328 },
+          "data": {
+            "title": "Receiving Dock",
+            "subtitle": "Building 3 Section",
+            "description": "Material receiving area",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "43"
+          }
+        },
+        {
+          "pin": 33,
+          "location": { "x": -1.856447118478594, "y": 0.22, "z": -0.03879194336107955 },
+          "data": {
+            "title": "Storage Warehouse",
+            "subtitle": "Building 3 Section",
+            "description": "Main storage warehouse",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "42"
+          }
+        },
+        {
+          "pin": 34,
+          "location": { "x": -2.372406485431531, "y": 0.22, "z": -0.052135722069561546 },
+          "data": {
+            "title": "Production Line 1",
+            "subtitle": "Building 3 Section",
+            "description": "Primary production line",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "41"
+          }
+        },
+        {
+          "pin": 35,
+          "location": { "x": -2.883917915082122, "y": 0.22, "z": -0.03434401715985588 },
+          "data": {
+            "title": "Production Line 2",
+            "subtitle": "Building 3 Section",
+            "description": "Secondary production line",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "40"
+          }
+        },
+        {
+          "pin": 36,
+          "location": { "x": -2.897261535029653, "y": 0.22, "z": 0.23697944808218194 },
+          "data": {
+            "title": "Quality Assurance",
+            "subtitle": "Building 3 Section",
+            "description": "Quality assurance department",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "39"
+          }
+        },
+        {
+          "pin": 37,
+          "location": { "x": -2.9281007851327723, "y": 0.22, "z": 0.6760000606128237 },
+          "data": {
+            "title": "Packaging Area 1",
+            "subtitle": "Building 3 Section",
+            "description": "Primary packaging station",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "38"
+          }
+        },
+        {
+          "pin": 38,
+          "location": { "x": -2.6252254018666177, "y": 0.22, "z": 0.6760000844800655 },
+          "data": {
+            "title": "Packaging Area 2",
+            "subtitle": "Building 3 Section",
+            "description": "Secondary packaging station",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "37"
+          }
+        },
+        {
+          "pin": 39,
+          "location": { "x": -2.342976991703014, "y": 0.22, "z": 0.686131734078538 },
+          "data": {
+            "title": "Shipping Prep",
+            "subtitle": "Building 3 Section",
+            "description": "Shipping preparation area",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "39"
+          }
+        },
+        {
+          "pin": 40,
+          "location": { "x": -2.032712358519429, "y": 0.22, "z": 0.6767781847080728 },
+          "data": {
+            "title": "Loading Dock",
+            "subtitle": "Building 3 Section",
+            "description": "Loading dock for shipments",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "36"
+          }
+        },
+        {
+          "pin": 41,
+          "location": { "x": -1.7759165597220077, "y": 0.22, "z": 0.6767781847069665 },
+          "data": {
+            "title": "Inventory Control",
+            "subtitle": "Building 3 Section",
+            "description": "Inventory management center",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "34"
+          }
+        },
+        {
+          "pin": 42,
+          "location": { "x": -1.50397069622301, "y": 0.22, "z": 0.6901302475194708 },
+          "data": {
+            "title": "Maintenance Bay",
+            "subtitle": "Building 3 Section",
+            "description": "Equipment maintenance area",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "33"
+          }
+        },
+        {
+          "pin": 43,
+          "location": { "x": -1.265590513217101, "y": 0.22, "z": 0.6992113960380061 },
+          "data": {
+            "title": "Tool Room",
+            "subtitle": "Building 3 Section",
+            "description": "Tool storage and distribution",
+            "type": "default",
+            "isChild": true,
+            "imageKey": "32"
+          }
+        },
+      ]
+    };
+
+    const loadingScreen = document.getElementById("loadingScreen");
+
+    // ================= SINGLE CAMERA ANIMATION =================
+    let cinematicAnimationStarted = false;
+
+    gltfLoader.load(
+      "./models/model.glb",
+      async (gltf) => {
+        console.log("✅ Model loaded successfully");
+
+        const model = gltf.scene;
+        scene.add(model);
+
+        model.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = false;
+            child.receiveShadow = false;
+          }
+        });
+
+        model.position.sub(modelCenter);
+
+        const scaleFactor = 0.8;
+        model.scale.setScalar(scaleFactor);
+
+        window.modelBoundingBox.setFromObject(model);
+
+        const boxSize = window.modelBoundingBox.getSize(new THREE.Vector3());
+        const boxCenter = window.modelBoundingBox.getCenter(new THREE.Vector3());
+
+        // Create Default Cam & Top View Cam definitions properly
+        defaultCam.position.set(
+          boxCenter.x + boxSize.x * 0.8,
+          boxCenter.y + boxSize.y * 0.5,
+          boxCenter.z + boxSize.z * 1.2
+        );
+        defaultCam.target.copy(boxCenter);
+        controls.minPolarAngle = Math.PI / 3.1;
+
+        topViewCam.position.set(
+          boxCenter.x,
+          Math.max(boxSize.y, boxSize.z) * 0.3,
+          boxCenter.z
+        );
+        topViewCam.target.copy(boxCenter);
+
+        // CINEMATIC INTRO: Start from High Top View (Static)
+        camera.position.set(
+          boxCenter.x,
+          Math.max(boxSize.y, boxSize.z) * 0.8,
+          boxCenter.z + 0.1
+        );
+        camera.lookAt(boxCenter);
+        controls.target.copy(boxCenter);
+        controls.update();
+
+        // Disable controls until "Got It" is clicked
+        controls.enabled = false;
+
+        modelLoaded = true;
+
+        // Load pins
+        loadPermanentPins();
+
+        imageManager.preloadCriticalImages();
+
+        // Initialize tutorial manager
+        tutorialManager = new TutorialManager();
+
+        audioPlayer.preloadAllAudio();
+
+        setupVRControllers();
+        setupGazeInteraction();
+        setupVRButton();
+
+        // Store references
+        window.camera = camera;
+        window.controls = controls;
+        window.defaultCam = defaultCam;
+
+        // Hide loading screen immediately
+        loadingScreen.classList.add("fade-out");
+        setTimeout(() => {
+          if (loadingScreen.parentNode) loadingScreen.remove();
+        }, 800);
+
+        // Show tutorial immediately
+        setTimeout(() => {
+          const tutorialOverlay = document.getElementById('tutorialOverlay');
+          if (tutorialOverlay) tutorialOverlay.classList.add('active');
+        }, 500);
+
+
+      },
+      (xhr) => {
+        const percentLoaded = (xhr.loaded / xhr.total * 100).toFixed(1);
+        console.log(`📦 Model loading: ${percentLoaded}%`);
+
+        const loadingText = document.querySelector('.loading-card span');
+        if (loadingText) {
+          loadingText.textContent = `Loading model... ${percentLoaded}%`;
+        }
+      },
+      (error) => {
+        console.error("❌ MODEL LOAD FAILED:", error);
+        alert("Model failed to load. Please check:\n1. Model file exists\n2. Draco decoder path\n3. Console for details");
+
+        const loadingCard = document.querySelector('.loading-card');
+        if (loadingCard) {
+          loadingCard.innerHTML = `
+        <h2 style="color: #ffffff;">Loading Failed</h2>
+        <p style="color: #ffffff; margin: 20px 0;">Check browser console for details</p>
+        <button onclick="location.reload()" style="padding: 10px 20px; background: #ffffff; color: #ea2f1c; border: 2px solid #ea2f1c; border-radius: 5px; cursor: pointer;">
+          Retry Loading
+        </button>
+      `;
+        }
+      }
+    );
+
+    const imageManager = new ImageManager();
+
+    let pinTexture = null;
+
+    try {
+      pinTexture = new THREE.TextureLoader().load("./images/pin.png", undefined, undefined, () => {
+        console.warn("⚠️ Pin texture not found, using fallback");
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+
+        ctx.beginPath();
+        ctx.arc(64, 64, 50, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.strokeStyle = '#ea2f1c';
+        ctx.lineWidth = 8;
+        ctx.stroke();
+
+        pinTexture = new THREE.CanvasTexture(canvas);
+      });
+    } catch (error) {
+      console.error("Failed to load pin texture:", error);
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, 128, 128);
+      ctx.strokeStyle = '#ea2f1c';
+      ctx.lineWidth = 8;
+      ctx.strokeRect(10, 10, 108, 108);
+      pinTexture = new THREE.CanvasTexture(canvas);
+    }
+
+    const DEFAULT_PIN_COLOR = 0xea2f1c;
+
+    function createPin(pos, data, isChild = false) {
+      const pin = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: pinTexture,
+          transparent: true,
+          color: DEFAULT_PIN_COLOR,
+          depthTest: true,
+          opacity: 0.9
+        })
+      );
+
+      if (isChild) {
+        pin.scale.set(0.08, 0.08, 0.08);
+      } else {
+        pin.scale.set(0.15, 0.15, 0.15);
+      }
+
+      pin.position.set(pos.x, pos.y, pos.z);
+      pin.userData = {
+        ...data,
+        color: DEFAULT_PIN_COLOR,
+        originalPosition: pos.clone(),
+        isChild: isChild || false
+      };
+
+      console.log(`Created ${isChild ? 'child' : 'parent'} pin at:`, pin.position, 'scale:', pin.scale);
+
+      scene.add(pin);
+      return pin;
+    }
+
+    function normalizePinData(pinData) {
+      const normalized = { ...pinData };
+
+      if (normalized.data && normalized.data.imageKey) {
+        let imageKey = normalized.data.imageKey.toString();
+        imageKey = imageKey.replace(/\.(jpg|jpeg|png)$/i, '');
+
+        const numKey = parseInt(imageKey);
+        if (!isNaN(numKey) && numKey >= 1 && numKey <= 43) {
+          normalized.data.imageKey = numKey.toString();
+        } else {
+          normalized.data.imageKey = imageKey;
+        }
+      }
+
+      return normalized;
+    }
+
+    function loadPermanentPins() {
+      if (!modelLoaded) return;
+
+      console.log("📌 Loading permanent pins...");
+
+      permanentPinsData.pins.forEach(pinData => {
+        const normalizedPinData = normalizePinData(pinData);
+
+        const position = new THREE.Vector3(
+          normalizedPinData.position.x,
+          normalizedPinData.position.y,
+          normalizedPinData.position.z
+        );
+
+        const pin = createPin(position, {
+          ...normalizedPinData.data,
+          id: normalizedPinData.id
+        });
+
+        pins.push({
+          pinObject: pin,
+          data: pin.userData,
+          index: pins.length
+        });
+      });
+
+      updatePinList();
+      console.log(`✅ Loaded ${pins.length} permanent pins`);
+    }
+
+    function loadChildPins(buildingType) {
+      if (!modelLoaded) return;
+
+      console.log(`📌 Loading child pins for ${buildingType}...`);
+
+      childPins.forEach(child => {
+        scene.remove(child.pinObject);
+      });
+      childPins = [];
+
+      const childData = childPinsData[buildingType];
+      if (!childData) {
+        console.error(`No child data found for building type: ${buildingType}`);
+        return;
+      }
+
+      childData.forEach(pinData => {
+        const normalizedPinData = { ...pinData };
+        if (normalizedPinData.data && normalizedPinData.data.imageKey) {
+          let imageKey = normalizedPinData.data.imageKey.toString();
+          imageKey = imageKey.replace(/\.(jpg|jpeg|png)$/i, '');
+          const numKey = parseInt(imageKey);
+          if (!isNaN(numKey) && numKey >= 1 && numKey <= 43) {
+            normalizedPinData.data.imageKey = numKey.toString();
+          }
+        }
+
+        const position = new THREE.Vector3(
+          normalizedPinData.location.x,
+          normalizedPinData.location.y,
+          normalizedPinData.location.z
+        );
+
+        console.log(`Creating child pin ${normalizedPinData.pin} at:`, position, 'imageKey:', normalizedPinData.data.imageKey);
+
+        const pin = createPin(position, {
+          ...normalizedPinData.data,
+          id: normalizedPinData.pin
+        }, true);
+
+        childPins.push({
+          pinObject: pin,
+          data: pin.userData,
+          index: childPins.length
+        });
+      });
+
+      console.log(`✅ Loaded ${childPins.length} child pins for ${buildingType}`);
+    }
+
+    function bouncePin(pin) {
+      console.log(`🎯 Starting bounce animation for: ${pin.userData.title}`);
+
+      if (bounceAnimation) {
+        bounceAnimation.kill();
+      }
+
+      const originalScale = pin.userData.isChild ? 0.08 : 0.15;
+
+      bounceAnimation = gsap.to(pin.scale, {
+        x: originalScale * 1.5,
+        y: originalScale * 1.5,
+        z: originalScale * 1.5,
+        duration: 0.6,
+        ease: "elastic.out(1, 0.5)",
+        onComplete: () => {
+          bounceAnimation = gsap.to(pin.scale, {
+            x: originalScale * 1.2,
+            y: originalScale * 1.2,
+            z: originalScale * 1.2,
+            duration: 0.8,
+            yoyo: true,
+            repeat: -1,
+            ease: "sine.inOut"
+          });
+        }
+      });
+
+      console.log(`🎯 Pin ${pin.userData.title} is now bouncing`);
+
+      // ADD GLOW EFFECT
+      pin.material.color.setHex(0xff4500); // Orange-Red Glow
+      pin.material.opacity = 1.0;
+    }
+
+    function enterBuildingView(parentPin) {
+      if (isInChildView) return;
+
+      isInChildView = true;
+      currentParentPin = parentPin;
+
+      console.log(`🏢 Entering ${parentPin.userData.title} view...`);
+
+      controls.autoRotate = false;
+
+      pins.forEach(pinItem => {
+        pinItem.pinObject.visible = false;
+      });
+
+      let buildingType = "building1";
+      if (parentPin.userData.id === 114) buildingType = "building2";
+      if (parentPin.userData.id === 115) buildingType = "building3";
+
+      loadChildPins(buildingType);
+
+      zoomToPin(parentPin, true);
+
+      exitBuildingBtn.style.display = 'flex';
+      setTimeout(() => exitBuildingBtn.classList.add('visible'), 10);
+
+      showCard(parentPin.userData);
+
+      updatePinList();
+
+      // Open pin manager to show internal sections
+      pinManager.classList.add('active');
+      listPinsBtn.classList.add('active');
+      listPinsBtn.innerHTML = '<i class="fas fa-times"></i> Close List';
+
+      // Move zoom controls to left side to avoid overlap
+      const zoomControls = document.getElementById('zoomControls');
+      zoomControls.style.right = 'auto';
+      zoomControls.style.left = '30px';
+
+      console.log(`🏢 Entered ${parentPin.userData.title} view - Hiding all parent pins, showing`, childPins.length, "child pins");
+    }
+
+    function exitBuildingView() {
+      console.log("🚪 Exiting building view...");
+
+      // If we're inside the building (child view), exit properly
+      if (isInChildView) {
+        isInChildView = false;
+
+        if (!isTopView) {
+          controls.autoRotate = true;
+        } else {
+          controls.autoRotate = false;
+        }
+
+        pins.forEach(pinItem => {
+          pinItem.pinObject.visible = true;
+        });
+
+        childPins.forEach(child => {
+          scene.remove(child.pinObject);
+        });
+        childPins = [];
+      }
+
+      if (bounceAnimation) {
+        bounceAnimation.kill();
+      }
+
+      if (clickedPin) {
+        const scale = clickedPin.userData.isChild ? 0.08 : 0.15;
+        clickedPin.scale.set(scale, scale, scale);
+        clickedPin.material.color.setHex(DEFAULT_PIN_COLOR); // Reset color
+        clickedPin.material.opacity = 0.9;
+        clickedPin = null;
+      }
+
+      // Reset camera to default position
+      gsap.to(camera.position, {
+        x: defaultCam.position.x,
+        y: defaultCam.position.y,
+        z: defaultCam.position.z,
+        duration: 0.8,
+        ease: "power2.inOut"
+      });
+
+      gsap.to(controls.target, {
+        x: defaultCam.target.x,
+        y: defaultCam.target.y,
+        z: defaultCam.target.z,
+        duration: 0.8,
+        ease: "power2.inOut",
+        onUpdate: () => {
+          controls.update();
+        }
+      });
+
+      // Hide the exit button and info card
+      exitBuildingBtn.classList.remove('visible');
+      exitBuildingBtn.style.display = 'none';
+      infoCard.classList.remove("active");
+
+      // Reset pin selection
+      selectedPinIndex = -1;
+      currentParentPin = null;
+
+      updatePinList();
+
+      if (!isTopView) {
+        controls.autoRotate = true;
+      }
+
+      console.log("🚪 Exited building view - Camera reset to default position");
+    }
+
+    function openVRMode(imageKey) {
+      console.log(`🚀 Opening VR mode for image key: ${imageKey} in same tab`);
+
+      const vrTourUrl = `vr-tour.html?image=${imageKey}`;
+      window.location.href = vrTourUrl;
+    }
+
+    function updatePinList() {
+      pinList.innerHTML = '';
+
+      const displayPins = isInChildView ? childPins : pins;
+
+      if (displayPins.length === 0) {
+        pinList.innerHTML = `
+      <div class="empty-pins-message">
+        <i class="fas fa-map-pin" style="font-size: 24px; margin-bottom: 10px;"></i><br>
+        No pins available
+      </div>
+    `;
+        return;
+      }
+
+      displayPins.forEach((pinItem, index) => {
+        const pin = pinItem.pinObject;
+
+        const div = document.createElement('div');
+        div.className = `pin-item ${index === selectedPinIndex ? 'selected' : ''}`;
+        div.dataset.id = pin.userData.id.toString();
+        div.dataset.title = pin.userData.title || '';
+        div.dataset.subtitle = pin.userData.subtitle || '';
+
+        const pinContent = `
+      <div class="pin-item-content">
+        <div class="pin-name">
+          <i class="fas fa-map-pin" style="margin-right: 8px;"></i>
+          ${pin.userData.title}
+          ${pin.userData.hasChildren ? '<span class="pin-type-badge"><i class="fas fa-building"></i> Building</span>' : ''}
+        </div>
+        <div class="pin-subtitle">${pin.userData.subtitle}</div>
+      </div>
+    `;
+
+        div.innerHTML = pinContent;
+
+        div.addEventListener('click', () => {
+          console.log(`📌 Pin list item clicked: ${pin.userData.title}`);
+
+          if (pin.userData.hasChildren) {
+            audioPlayer.play('audio1').catch(err => console.warn('Audio1 playback failed:', err));
+          } else {
+            audioPlayer.play('audio2').catch(err => console.warn('Audio2 playback failed:', err));
+          }
+
+          if (bounceAnimation) {
+            bounceAnimation.kill();
+          }
+
+          if (clickedPin && clickedPin !== pin) {
+            const prevScale = clickedPin.userData.isChild ? 0.08 : 0.15;
+            clickedPin.scale.set(prevScale, prevScale, prevScale);
+          }
+
+          clickedPin = pin;
+          selectedPinIndex = index;
+
+          updatePinList();
+
+          bouncePin(pin);
+
+          if (isInChildView) {
+            // For child pins, zoom (which will show card after completion)
+            zoomToPinChild(pin);
+          } else {
+            if (pin.userData.hasChildren) {
+              enterBuildingView(pin);
+            } else {
+              handlePinClick(pin);
+            }
+          }
+
+          if (!pinManager.classList.contains('active')) {
+            pinManager.classList.add('active');
+            listPinsBtn.classList.add('active');
+            listPinsBtn.innerHTML = '<i class="fas fa-times"></i> Close List';
+          }
+        });
+
+        pinList.appendChild(div);
+      });
+
+      if (isInChildView) {
+        pinCount.textContent = `${childPins.length} Internal Sections`;
+        pinManagerTitle.textContent = `Internal Sections (${childPins.length})`;
+      } else {
+        pinCount.textContent = `${pins.length} Pins Available`;
+        pinManagerTitle.textContent = `Pin Locations (${pins.length})`;
+      }
+    }
+
+    // ================= CAMERA MOVEMENT FUNCTIONS =================
+
+    function zoomToPinChild(pin) {
+      if (!pin) return;
+
+      controls.autoRotate = false;
+
+      if (clickedPin && clickedPin !== pin) {
+        if (bounceAnimation) {
+          bounceAnimation.kill();
+        }
+        const prevScale = clickedPin.userData.isChild ? 0.08 : 0.15;
+        clickedPin.scale.set(prevScale, prevScale, prevScale);
+        clickedPin.material.color.setHex(DEFAULT_PIN_COLOR);
+        clickedPin.material.opacity = 0.9;
+      }
+
+      clickedPin = pin;
+
+      bouncePin(pin);
+
+      const index = childPins.findIndex(p => p.pinObject === pin);
+      if (index !== -1) {
+        selectedPinIndex = index;
+        updatePinList();
+
+        if (!pinManager.classList.contains('active')) {
+          pinManager.classList.add('active');
+          listPinsBtn.classList.add('active');
+          listPinsBtn.innerHTML = '<i class="fas fa-times"></i> Close List';
+        }
+      }
+
+      const pinPosition = pin.position;
+      const distance = 0.8;
+
+      const currentDirection = camera.position.clone().sub(controls.target).normalize();
+
+      const newCameraPosition = pinPosition.clone().add(currentDirection.multiplyScalar(distance));
+
+      newCameraPosition.y = Math.max(newCameraPosition.y, pinPosition.y + 0.3);
+
+      gsap.to(camera.position, {
+        x: newCameraPosition.x,
+        y: newCameraPosition.y,
+        z: newCameraPosition.z,
+        duration: 0.5,
+        ease: "power2.inOut"
+      });
+
+      gsap.to(controls.target, {
+        x: pinPosition.x,
+        y: pinPosition.y,
+        z: pinPosition.z,
+        duration: 0.5,
+        ease: "power2.inOut",
+        onUpdate: () => {
+          controls.update();
+        },
+        onComplete: () => {
+          // Show card AFTER zoom completes
+          showCard(pin.userData);
+        }
+      });
+    }
+
+    function handlePinClick(pin) {
+      console.log(`🎯 Handling pin click for: ${pin.userData.title}`);
+
+      controls.autoRotate = false;
+
+      if (bounceAnimation) {
+        bounceAnimation.kill();
+      }
+
+      if (clickedPin && clickedPin !== pin) {
+        const prevScale = clickedPin.userData.isChild ? 0.08 : 0.15;
+        clickedPin.scale.set(prevScale, prevScale, prevScale);
+        clickedPin.material.color.setHex(DEFAULT_PIN_COLOR);
+        clickedPin.material.opacity = 0.9;
+      }
+
+      clickedPin = pin;
+
+      bouncePin(pin);
+
+      zoomToPin(pin);
+
+      showCard(pin.userData);
+
+      const pinsArray = isInChildView ? childPins : pins;
+      const index = pinsArray.findIndex(p => p.pinObject === pin);
+      if (index !== -1) {
+        selectedPinIndex = index;
+        updatePinList();
+
+        if (!pinManager.classList.contains('active')) {
+          pinManager.classList.add('active');
+          listPinsBtn.classList.add('active');
+          listPinsBtn.innerHTML = '<i class="fas fa-times"></i> Close List';
+          // Move zoom controls to left side to avoid overlap
+          const zoomControls = document.getElementById('zoomControls');
+          zoomControls.style.right = 'auto';
+          zoomControls.style.left = '30px';
+        }
+      }
+
+      if (vrSession && vrSession.inputSources && vrSession.inputSources[0]) {
+        const inputSource = vrSession.inputSources[0];
+        if (inputSource.hapticActuators && inputSource.hapticActuators[0]) {
+          inputSource.hapticActuators[0].pulse(0.7, 150);
+        }
+      }
+
+      // Show Exit Building button for parent pins with children
+      if (pin.userData.hasChildren) {
+        exitBuildingBtn.style.display = 'flex';
+        setTimeout(() => exitBuildingBtn.classList.add('visible'), 10);
+      }
+    }
+
+    function zoomToPin(pin, isBuildingEnter = false) {
+      if (!pin) return;
+
+      const pinPosition = pin.position;
+      const distance = isBuildingEnter ? 1.5 : 2.5;
+
+      const currentDirection = camera.position.clone().sub(controls.target).normalize();
+
+      const newCameraPosition = pinPosition.clone().add(currentDirection.multiplyScalar(distance));
+
+      newCameraPosition.y = Math.max(newCameraPosition.y, pinPosition.y + (isBuildingEnter ? 0.5 : 1));
+
+      gsap.to(camera.position, {
+        x: newCameraPosition.x,
+        y: newCameraPosition.y,
+        z: newCameraPosition.z,
+        duration: 0.5,
+        ease: "power2.inOut"
+      });
+
+      gsap.to(controls.target, {
+        x: pinPosition.x,
+        y: pinPosition.y,
+        z: pinPosition.z,
+        duration: 0.5,
+        ease: "power2.inOut",
+        onUpdate: () => {
+          controls.update();
+        }
+      });
+    }
+
+    const infoCard = document.getElementById("infoCard");
+    const placeTitle = document.getElementById("placeTitle");
+    const placeSubtitle = document.getElementById("placeSubtitle");
+    const placeDesc = document.getElementById("placeDesc");
+    const closeCard = document.getElementById("closeCard");
+
+    function showCard(pinData) {
+      console.log('🔍 ============ SHOWCARD DEBUG ============');
+      console.log('🔍 Pin Title:', pinData.title);
+      console.log('🔍 ImageKey:', pinData.imageKey, 'Type:', typeof pinData.imageKey);
+      console.log('🔍 isChild:', pinData.isChild);
+      console.log('🔍 hasChildren:', pinData.hasChildren);
+      console.log('🔍 ID:', pinData.id);
+      console.log('🔍 isInChildView:', isInChildView);
+      console.log('🔍 Full pinData:', JSON.stringify(pinData, null, 2));
+
+      const imageKey = pinData.imageKey || 'banner';
+      imageManager.loadForDisplay(imageKey);
+
+      placeTitle.textContent = pinData.title;
+      placeSubtitle.textContent = pinData.subtitle;
+      placeDesc.textContent = pinData.description;
+
+      // PRIORITY 1: Check for imageKey first (VR Mode) OR if it's a child pin
+      if (pinData.imageKey || pinData.isChild) {
+        console.log('✅ SHOWING VR BUTTON - imageKey:', pinData.imageKey, 'OR isChild:', pinData.isChild);
+        actionButton.style.display = 'flex';
+        actionButton.innerHTML = '<i class="fas fa-vr-cardboard"></i> Enter VR Mode';
+        actionButton.className = 'card-vr-button';
+        actionButton.disabled = false;
+        actionButton.onclick = () => {
+          const vrImageKey = pinData.imageKey || '1'; // Fallback to image 1
+          console.log('🚀 VR button clicked, opening image:', vrImageKey);
+          audioPlayer.play('audio2').catch(err => console.warn('Audio2 playback failed:', err));
+          openVRMode(vrImageKey);
+        };
+      }
+      // PRIORITY 2: Check for buildings (Enter Building)
+      else if (!isInChildView && pinData.hasChildren && [113, 114, 115].includes(pinData.id)) {
+        console.log('✅ SHOWING BUILDING BUTTON');
+        actionButton.style.display = 'flex';
+        actionButton.innerHTML = '<i class="fas fa-door-open"></i> Enter Building';
+        actionButton.className = 'card-button';
+        actionButton.onclick = () => {
+          audioPlayer.play('audio1').catch(err => console.warn('Audio1 playback failed:', err));
+          const pin = pins.find(p => p.data.id === pinData.id)?.pinObject;
+          if (pin) {
+            enterBuildingView(pin);
+          }
+        };
+      }
+      // No action available
+      else {
+        console.log('⚠️ NO BUTTON - no imageKey, no isChild, no hasChildren');
+        actionButton.style.display = 'none';
+        actionButton.onclick = null;
+      }
+
+      // Force card to show WITHOUT slide animation on close
+      infoCard.classList.add("active");
+      infoCard.style.display = 'block';
+      infoCard.style.opacity = '1';
+      infoCard.style.pointerEvents = 'auto';
+      infoCard.style.transform = 'translateX(0)'; // Keep it on screen
+
+      console.log('✅ Info card opened - Button display:', actionButton.style.display);
+      console.log('🔍 ========================================');
+    }
+
+    closeCard.addEventListener('click', () => {
+      console.log('🔴 Close button clicked - hiding info card');
+      infoCard.classList.remove("active");
+      // Reset all inline styles to allow CSS to take over
+      infoCard.style.display = '';
+      infoCard.style.opacity = '';
+      infoCard.style.pointerEvents = '';
+      infoCard.style.transform = '';
+      audioPlayer.stop();
+    });
+
+    const zoomControls = document.getElementById('zoomControls');
+
+    listPinsBtn.addEventListener('click', () => {
+      audioPlayer.play('audio1').catch(err => console.warn('Audio1 playback failed:', err));
+      pinManager.classList.toggle('active');
+      listPinsBtn.classList.toggle('active');
+
+      if (pinManager.classList.contains('active')) {
+        listPinsBtn.innerHTML = '<i class="fas fa-times"></i> Close List';
+        // Move zoom controls to left side to avoid overlap
+        zoomControls.style.right = 'auto';
+        zoomControls.style.left = '30px';
+      } else {
+        listPinsBtn.innerHTML = '<i class="fas fa-list"></i> List of Pins';
+        // Reset zoom controls position
+        zoomControls.style.right = '';
+        zoomControls.style.left = '';
+      }
+    });
+
+    closeManager.addEventListener('click', () => {
+      audioPlayer.stop();
+      pinManager.classList.remove('active');
+      listPinsBtn.classList.remove('active');
+      listPinsBtn.innerHTML = '<i class="fas fa-list"></i> List of Pins';
+      // Reset zoom controls position
+      zoomControls.style.right = '';
+      zoomControls.style.left = '';
+      // Clear search input
+      pinSearchInput.value = '';
+      filterPinList('');
+    });
+
+    exitBuildingBtn.addEventListener('click', () => {
+      audioPlayer.play('audio1').catch(err => console.warn('Audio1 playback failed:', err));
+      exitBuildingView();
+    });
+
+    // ================= PIN LIST SEARCH FUNCTIONALITY =================
+    const pinSearchInput = document.getElementById('pinSearchInput');
+    let currentSearchQuery = '';
+
+    function filterPinList(query) {
+      currentSearchQuery = query.toLowerCase().trim();
+      const pinItems = pinList.querySelectorAll('.pin-item');
+
+      pinItems.forEach(item => {
+        const title = (item.dataset.title || '').toLowerCase();
+        const subtitle = (item.dataset.subtitle || '').toLowerCase();
+        const id = item.dataset.id || '';
+
+        const matches = id === currentSearchQuery ||
+          title.includes(currentSearchQuery) ||
+          subtitle.includes(currentSearchQuery) ||
+          currentSearchQuery === '';
+
+        item.style.display = matches ? 'block' : 'none';
+      });
+
+      // Update pin count with filtered results
+      const visibleItems = Array.from(pinItems).filter(item => item.style.display !== 'none');
+      pinCount.textContent = `${visibleItems.length} Pins Found`;
+    }
+
+    pinSearchInput.addEventListener('input', (e) => {
+      filterPinList(e.target.value);
+    });
+
+    pinSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const query = pinSearchInput.value.toLowerCase().trim();
+        if (!query) return;
+
+        const allPins = isInChildView ? childPins : pins;
+        let bestMatch = null;
+
+        // 1. Exact ID match
+        bestMatch = allPins.find(p => p.pinObject.userData.id.toString() === query);
+
+        // 2. Exact Title match
+        if (!bestMatch) {
+          bestMatch = allPins.find(p => (p.pinObject.userData.title || '').toLowerCase() === query);
+        }
+
+        // 3. First partial match
+        if (!bestMatch) {
+          bestMatch = allPins.find(p => {
+            const data = p.pinObject.userData;
+            const title = (data.title || '').toLowerCase();
+            return title.includes(query);
+          });
+        }
+
+        if (bestMatch) {
+          navigateToPinFromSearch(bestMatch);
+        }
+      }
+    });
+
+    function navigateToPinFromSearch(pinItem) {
+      audioPlayer.play('audio2').catch(err => { });
+
+      // Close pin manager
+      pinManager.classList.remove('active');
+      listPinsBtn.classList.remove('active');
+      listPinsBtn.innerHTML = '<i class="fas fa-list"></i> List of Pins';
+      zoomControls.style.right = '';
+      zoomControls.style.left = '';
+
+      const pin = pinItem.pinObject;
+      const data = pin.userData;
+
+      if (bounceAnimation) bounceAnimation.kill();
+      if (clickedPin) {
+        const scale = clickedPin.userData.isChild ? 0.08 : 0.15;
+        clickedPin.scale.set(scale, scale, scale);
+      }
+
+      clickedPin = pin;
+      bouncePin(pin);
+      showCard(data);
+
+      if (data.isChild) {
+        if (!isInChildView) {
+          if ([15, 16, 17, 18, 19, 20, 21, 22].includes(data.id)) enterBuildingView(pins.find(p => p.data.id === 113).pinObject);
+          else if ([23, 24, 25, 26, 27, 28, 29, 30, 31].includes(data.id)) enterBuildingView(pins.find(p => p.data.id === 114).pinObject);
+          else if ([32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43].includes(data.id)) enterBuildingView(pins.find(p => p.data.id === 115).pinObject);
+          setTimeout(() => zoomToPinChild(pin), 500);
+        } else {
+          zoomToPinChild(pin);
+        }
+      } else {
+        if (isInChildView) exitBuildingView();
+        if (data.hasChildren) enterBuildingView(pin);
+        else handlePinClick(pin);
+      }
+    }
+
+
+    const zoomInBtn = document.getElementById('zoomIn');
+    const zoomOutBtn = document.getElementById('zoomOut');
+    const resetZoomBtn = document.getElementById('resetZoom');
+
+    zoomInBtn.addEventListener('click', () => {
+      audioPlayer.play('audio2').catch(err => console.warn('Audio2 playback failed:', err));
+      const currentDistance = camera.position.distanceTo(controls.target);
+      const newDistance = Math.max(currentDistance * 0.8, controls.minDistance);
+
+      const direction = camera.position.clone().sub(controls.target).normalize();
+      const newPosition = controls.target.clone().add(direction.multiplyScalar(newDistance));
+
+      gsap.to(camera.position, {
+        x: newPosition.x,
+        y: newPosition.y,
+        z: newPosition.z,
+        duration: 0.3,
+        ease: "power2.out"
+      });
+    });
+
+    zoomOutBtn.addEventListener('click', () => {
+      audioPlayer.play('audio2').catch(err => console.warn('Audio2 playback failed:', err));
+      const currentDistance = camera.position.distanceTo(controls.target);
+      const newDistance = Math.min(currentDistance * 1.2, controls.maxDistance);
+
+      const direction = camera.position.clone().sub(controls.target).normalize();
+      const newPosition = controls.target.clone().add(direction.multiplyScalar(newDistance));
+
+      gsap.to(camera.position, {
+        x: newPosition.x,
+        y: newPosition.y,
+        z: newPosition.z,
+        duration: 0.3,
+        ease: "power2.out"
+      });
+    });
+
+    resetZoomBtn.addEventListener('click', () => {
+      audioPlayer.play('audio1').catch(err => console.warn('Audio1 playback failed:', err));
+      if (!isTopView && !isInChildView && !clickedPin) {
+        controls.autoRotate = true;
+      } else {
+        controls.autoRotate = false;
+      }
+
+      if (isTopView) {
+        controls.minPolarAngle = 0;
+      } else {
+        controls.minPolarAngle = Math.PI / 3.1;
+      }
+
+      if (isTopView) {
+        gsap.to(camera.position, {
+          x: topViewCam.position.x,
+          y: topViewCam.position.y,
+          z: topViewCam.position.z,
+          duration: 0.8,
+          ease: "power2.inOut"
+        });
+        gsap.to(controls.target, {
+          x: topViewCam.target.x,
+          y: topViewCam.target.y,
+          z: topViewCam.target.z,
+          duration: 0.8,
+          ease: "power2.inOut"
+        });
+      } else {
+        gsap.to(camera.position, {
+          x: defaultCam.position.x,
+          y: defaultCam.position.y,
+          z: defaultCam.position.z,
+          duration: 0.8,
+          ease: "power2.inOut"
+        });
+        gsap.to(controls.target, {
+          x: defaultCam.target.x,
+          y: defaultCam.target.y,
+          z: defaultCam.target.z,
+          duration: 0.8,
+          ease: "power2.inOut"
+        });
+      }
+    });
+
+    const btn3D = document.getElementById("btn3D");
+    const btn2D = document.getElementById("btn2D");
+
+    btn2D.onclick = () => {
+      audioPlayer.play('audio1').catch(err => console.warn('Audio1 playback failed:', err));
+      if (!modelLoaded) return;
+
+      isTopView = true;
+      btn2D.classList.add("active");
+      btn3D.classList.remove("active");
+      controls.autoRotate = false;
+      controls.enableRotate = false;
+
+      controls.minPolarAngle = 0;
+
+      gsap.to(camera.position, {
+        x: topViewCam.position.x,
+        y: topViewCam.position.y,
+        z: topViewCam.position.z,
+        duration: 0.8,
+        ease: "power2.inOut"
+      });
+
+      gsap.to(controls.target, {
+        x: topViewCam.target.x,
+        y: topViewCam.target.y,
+        z: topViewCam.target.z,
+        duration: 0.8,
+        ease: "power2.inOut"
+      });
+    };
+
+    btn3D.onclick = () => {
+      audioPlayer.play('audio1').catch(err => console.warn('Audio1 playback failed:', err));
+      if (!modelLoaded) return;
+
+      isTopView = false;
+      btn3D.classList.add("active");
+      btn2D.classList.remove("active");
+      controls.enableRotate = true;
+
+      controls.minPolarAngle = Math.PI / 3.1;
+
+      if (!isInChildView && !clickedPin) {
+        controls.autoRotate = true;
+      } else {
+        controls.autoRotate = false;
+      }
+
+      gsap.to(camera.position, {
+        x: defaultCam.position.x,
+        y: defaultCam.position.y,
+        z: defaultCam.position.z,
+        duration: 0.8,
+        ease: "power2.inOut"
+      });
+
+      gsap.to(controls.target, {
+        x: defaultCam.target.x,
+        y: defaultCam.target.y,
+        z: defaultCam.target.z,
+        duration: 0.8,
+        ease: "power2.inOut"
+      });
+    };
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let hoveredPin = null;
+
+    window.addEventListener("mousemove", e => {
+      mouse.x = (e.clientX / innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+    });
+
+    window.addEventListener("click", (e) => {
+      if (!modelLoaded) return;
+
+      if (!vrSession) {
+        raycaster.setFromCamera(mouse, camera);
+
+        let pinObjects;
+        if (isInChildView) {
+          pinObjects = childPins.map(p => p.pinObject);
+        } else {
+          pinObjects = pins.map(p => p.pinObject).filter(pin => pin.visible);
+        }
+
+        const hits = raycaster.intersectObjects(pinObjects);
+
+        if (hits.length > 0) {
+          const clickedPinObj = hits[0].object;
+
+          if (clickedPinObj.userData.hasChildren) {
+            audioPlayer.play('audio1').catch(err => console.warn('Audio1 playback failed:', err));
+          } else {
+            audioPlayer.play('audio2').catch(err => console.warn('Audio2 playback failed:', err));
+          }
+
+          if (isInChildView) {
+            zoomToPinChild(clickedPinObj);
+          } else {
+            if (clickedPinObj.userData.hasChildren) {
+              enterBuildingView(clickedPinObj);
+            } else {
+              handlePinClick(clickedPinObj);
+            }
+          }
+
+          e.stopPropagation();
+        } else {
+          if (clickedPin && bounceAnimation) {
+            bounceAnimation.kill();
+            const scale = clickedPin.userData.isChild ? 0.08 : 0.15;
+            clickedPin.scale.set(scale, scale, scale);
+            clickedPin.material.opacity = 0.9;
+            clickedPin.material.color.setHex(DEFAULT_PIN_COLOR); // Reset color
+            clickedPin = null;
+            audioPlayer.stop();
+          }
+
+          if (!infoCard.contains(e.target) && !pinManager.contains(e.target)) {
+            infoCard.classList.remove("active");
+          }
+        }
+      }
+    });
+
+    if (deviceDetector.touchDevice) {
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let touchStartTime = 0;
+      let isDragging = false;
+
+      window.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+          touchStartTime = Date.now();
+          isDragging = false;
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 1) {
+          const touch = e.touches[0];
+          const deltaX = Math.abs(touch.clientX - touchStartX);
+          const deltaY = Math.abs(touch.clientY - touchStartY);
+
+          if (deltaX > 10 || deltaY > 10) {
+            isDragging = true;
+          }
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchend', (e) => {
+        if (!isDragging && e.changedTouches.length === 1) {
+          const touch = e.changedTouches[0];
+          const touchDuration = Date.now() - touchStartTime;
+
+          if (touchDuration < 300) {
+            mouse.x = (touch.clientX / innerWidth) * 2 - 1;
+            mouse.y = -(touch.clientY / innerHeight) * 2 + 1;
+
+            if (!modelLoaded || vrSession) return;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            let pinObjects;
+            if (isInChildView) {
+              pinObjects = childPins.map(p => p.pinObject);
+            } else {
+              pinObjects = pins.map(p => p.pinObject).filter(pin => pin.visible);
+            }
+
+            const hits = raycaster.intersectObjects(pinObjects);
+
+            if (hits.length > 0) {
+              const clickedPinObj = hits[0].object;
+
+              if (clickedPinObj.userData.hasChildren) {
+                audioPlayer.play('audio1').catch(err => console.warn('Audio1 playback failed:', err));
+              } else {
+                audioPlayer.play('audio2').catch(err => console.warn('Audio2 playback failed:', err));
+              }
+
+              if (isInChildView) {
+                console.log("🔴 Child pin clicked in 3D view:", clickedPinObj.userData.title);
+                zoomToPinChild(clickedPinObj);
+              } else {
+                if (clickedPinObj.userData.hasChildren) {
+                  enterBuildingView(clickedPinObj);
+                } else {
+                  handlePinClick(clickedPinObj);
+                }
+              }
+            } else {
+              if (clickedPin && bounceAnimation) {
+                bounceAnimation.kill();
+                const scale = clickedPin.userData.isChild ? 0.08 : 0.15;
+                clickedPin.scale.set(scale, scale, scale);
+                clickedPin.material.opacity = 0.9;
+                clickedPin.material.color.setHex(DEFAULT_PIN_COLOR); // Reset color
+                clickedPin = null;
+                audioPlayer.stop();
+              }
+            }
+          }
+        }
+      }, { passive: true });
+    }
+
+    let time = 0;
+    renderer.setAnimationLoop(() => {
+      time += 0.016;
+
+      if (modelLoaded) {
+        if (!vrSession && !deviceDetector.touchDevice) {
+          raycaster.setFromCamera(mouse, camera);
+
+          let pinObjects;
+          if (isInChildView) {
+            pinObjects = childPins.map(p => p.pinObject);
+          } else {
+            pinObjects = pins.map(p => p.pinObject).filter(pin => pin.visible);
+          }
+
+          const hits = raycaster.intersectObjects(pinObjects);
+
+          pinObjects.forEach(pin => {
+            if (pin === clickedPin) return;
+
+            if (isInChildView) {
+              pin.scale.set(0.08, 0.08, 0.08);
+            } else {
+              pin.scale.set(0.15, 0.15, 0.15);
+            }
+            // Reset color/opacity if not hovered
+            if (pin !== hoveredPin) {
+              pin.material.color.setHex(DEFAULT_PIN_COLOR);
+              pin.material.opacity = 0.9;
+            }
+          });
+
+          if (hits.length > 0 && hits[0].object !== clickedPin) {
+            hoveredPin = hits[0].object;
+
+            if (isInChildView) {
+              hoveredPin.scale.set(0.12, 0.12, 0.12);
+            } else {
+              hoveredPin.scale.set(0.25, 0.25, 0.25);
+            }
+
+            document.body.style.cursor = "pointer";
+          } else {
+            if (hoveredPin && hoveredPin !== clickedPin) {
+              hoveredPin = null;
+            }
+            document.body.style.cursor = "default";
+          }
+        }
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    });
+
+    // ================= KEYBOARD NAVIGATION =================
+    let keyboardNavigationActive = false;
+
+    function isInputFocused() {
+      const activeElement = document.activeElement;
+      return activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.isContentEditable
+      );
+    }
+
+    function findNearestPinInDirection(direction) {
+      if (!clickedPin) return null;
+
+      const currentPins = isInChildView ? childPins : pins;
+      const currentPos = clickedPin.position.clone();
+
+      // Get camera's view vectors
+      const cameraForward = new THREE.Vector3();
+      camera.getWorldDirection(cameraForward);
+      cameraForward.y = 0;
+      cameraForward.normalize();
+
+      const cameraRight = new THREE.Vector3();
+      cameraRight.crossVectors(cameraForward, new THREE.Vector3(0, 1, 0)).normalize();
+
+      let candidates = [];
+
+      currentPins.forEach(pinItem => {
+        const pin = pinItem.pinObject;
+        if (pin === clickedPin) return;
+
+        const pinPos = pin.position.clone();
+        const toPin = new THREE.Vector3().subVectors(pinPos, currentPos);
+        toPin.y = 0;
+
+        // Project onto camera axes
+        const rightScore = toPin.dot(cameraRight);
+        const forwardScore = toPin.dot(cameraForward);
+        const distance = toPin.length();
+
+        if (distance < 0.01) return;
+
+        let isInDirection = false;
+        let relevantScore = 0;
+
+        switch (direction) {
+          case 'left':
+            isInDirection = rightScore < -0.05;
+            relevantScore = Math.abs(rightScore);
+            break;
+          case 'right':
+            isInDirection = rightScore > 0.05;
+            relevantScore = Math.abs(rightScore);
+            break;
+          case 'front':
+            isInDirection = forwardScore > 0.05;
+            relevantScore = Math.abs(forwardScore);
+            break;
+          case 'back':
+            isInDirection = forwardScore < -0.05;
+            relevantScore = Math.abs(forwardScore);
+            break;
+        }
+
+        if (isInDirection) {
+          candidates.push({ pin, distance, relevantScore });
+        }
+      });
+
+      if (candidates.length === 0) return null;
+
+      // Sort by distance, prioritize pins more aligned with the direction
+      candidates.sort((a, b) => {
+        const aScore = a.distance / (a.relevantScore + 0.1);
+        const bScore = b.distance / (b.relevantScore + 0.1);
+        return aScore - bScore;
+      });
+
+      return candidates[0].pin;
+    }
+
+    function navigateToPinByKeyboard(pin) {
+      if (!pin) return;
+
+      console.log(`⌨️ Navigating to pin: ${pin.userData.title}`);
+
+      // Deselect current pin
+      if (clickedPin && bounceAnimation) {
+        bounceAnimation.kill();
+        const scale = clickedPin.userData.isChild ? 0.08 : 0.15;
+        clickedPin.scale.set(scale, scale, scale);
+      }
+
+      clickedPin = pin;
+      bouncePin(pin);
+
+      // Navigate to pin
+      if (isInChildView) {
+        zoomToPinChild(pin);
+      } else {
+        zoomToPin(pin);
+      }
+
+      // Update selection in list
+      const pinsArray = isInChildView ? childPins : pins;
+      const index = pinsArray.findIndex(p => p.pinObject === pin);
+      if (index !== -1) {
+        selectedPinIndex = index;
+        updatePinList();
+      }
+    }
+
+    function handleKeyboardNavigation(e) {
+      // Skip if input is focused
+      if (isInputFocused()) return;
+
+      const key = e.key;
+
+      // Arrow keys - directional navigation
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
+        e.preventDefault();
+
+        if (!clickedPin) {
+          // If no pin selected, select the first one
+          const pinsArray = isInChildView ? childPins : pins;
+          if (pinsArray.length > 0) {
+            navigateToPinByKeyboard(pinsArray[0].pinObject);
+          }
+          return;
+        }
+
+        let direction;
+        switch (key) {
+          case 'ArrowLeft': direction = 'left'; break;
+          case 'ArrowRight': direction = 'right'; break;
+          case 'ArrowUp': direction = 'front'; break;
+          case 'ArrowDown': direction = 'back'; break;
+        }
+
+        const nearestPin = findNearestPinInDirection(direction);
+        if (nearestPin) {
+          navigateToPinByKeyboard(nearestPin);
+        }
+      }
+
+      // Enter - open info card
+      if (key === 'Enter') {
+        e.preventDefault();
+        if (clickedPin) {
+          const data = clickedPin.userData;
+          if (data.hasChildren) {
+            enterBuildingView(clickedPin);
+          } else {
+            showCard(data);
+          }
+        }
+      }
+
+      // Escape - close/exit
+      if (key === 'Escape') {
+        e.preventDefault();
+
+        // Close search modal if open
+        if (searchModal.classList.contains('active')) {
+          searchModal.classList.remove('active');
+          searchPinsBtn.classList.remove('active');
+          searchPinsBtn.innerHTML = '<i class="fas fa-search"></i> Search Pins';
+          return;
+        }
+
+        // Close info card if open
+        if (infoCard.classList.contains('active')) {
+          infoCard.classList.remove('active');
+          audioPlayer.stop();
+          return;
+        }
+
+        // Exit building view if in child view
+        if (isInChildView) {
+          exitBuildingView();
+          return;
+        }
+
+        // Deselect current pin
+        if (clickedPin && bounceAnimation) {
+          bounceAnimation.kill();
+          const scale = clickedPin.userData.isChild ? 0.08 : 0.15;
+          clickedPin.scale.set(scale, scale, scale);
+          clickedPin.material.color.setHex(DEFAULT_PIN_COLOR); // Reset color
+          clickedPin.material.opacity = 0.9;
+          clickedPin = null;
+          selectedPinIndex = -1;
+          updatePinList();
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyboardNavigation);
+
+    console.log('⌨️ Keyboard navigation enabled: Arrow keys to navigate, Enter to select, Escape to exit');
+
+
+    // --- AUTO NAVIGATION LOGIC ---
+    const autoNavBtn = document.getElementById('autoNavBtn');
+    let isAutoNavigating = false;
+    let autoNavTimeout = null;
+    let currentAutoNavIndex = 0;
+
+    // Show button logic moved to model loader success callback
+
+    if (autoNavBtn) {
+      autoNavBtn.addEventListener('click', toggleAutoNav);
+    }
+
+    function toggleAutoNav() {
+      if (isAutoNavigating) {
+        stopAutoNav();
+      } else {
+        startAutoNav();
+      }
+    }
+
+    function startAutoNav() {
+      if (isAutoNavigating) return;
+
+      console.log("🚀 Starting Auto Navigation...");
+      isAutoNavigating = true;
+      autoNavBtn.classList.add('active');
+      autoNavBtn.innerHTML = '<i class="fas fa-stop"></i> Stop Auto Nav';
+
+      // Reset camera to default controls before starting
+      controls.autoRotate = false;
+
+      // Start from first pin
+      currentAutoNavIndex = 0;
+      navigateNextPin();
+    }
+
+    function stopAutoNav() {
+      console.log("🛑 Stopping Auto Navigation");
+      isAutoNavigating = false;
+      autoNavBtn.classList.remove('active');
+      autoNavBtn.innerHTML = '<i class="fas fa-play"></i> Auto Navigate';
+
+      if (autoNavTimeout) {
+        clearTimeout(autoNavTimeout);
+        autoNavTimeout = null;
+      }
+
+      // Re-enable auto rotate if needed
+      if (!isTopView) controls.autoRotate = true;
+    }
+
+    function navigateNextPin() {
+      if (!isAutoNavigating) return;
+
+      let targetPins = pins;
+      if (isInChildView) {
+        targetPins = childPins;
+      }
+
+      if (currentAutoNavIndex >= targetPins.length) {
+        stopAutoNav();
+        return;
+      }
+
+      const pinEntry = targetPins[currentAutoNavIndex];
+      const pin = pinEntry.pinObject;
+
+      console.log(`📍 Auto Nav: Visiting ${pin.userData.title} (${currentAutoNavIndex + 1}/${targetPins.length})`);
+
+      // Simulate selection (Set clickedPin to prevent render loop reset)
+      if (clickedPin && clickedPin !== pin && bounceAnimation) {
+        bounceAnimation.kill();
+        const scale = clickedPin.userData.isChild ? 0.08 : 0.15;
+        clickedPin.scale.set(scale, scale, scale);
+        clickedPin.material.color.setHex(DEFAULT_PIN_COLOR);
+        clickedPin.material.opacity = 0.9;
+      }
+      clickedPin = pin;
+
+      bouncePin(pin);
+
+      // Zoom logic
+      if (isInChildView) {
+        zoomToPinChild(pin);
+        setTimeout(() => showCard(pin.userData), 500);
+      } else {
+        zoomToPin(pin);
+        setTimeout(() => showCard(pin.userData), 500);
+      }
+
+      // Update selection UI
+      selectedPinIndex = currentAutoNavIndex;
+      updatePinList();
+
+      // Schedule next move (1.5s transition + 2s pause)
+      autoNavTimeout = setTimeout(() => {
+        currentAutoNavIndex++;
+        navigateNextPin();
+      }, 3500);
+    }
+
+    window.addEventListener("resize", () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+
+      if (deviceDetector) {
+        deviceDetector.orientation = deviceDetector.getOrientation();
+      }
+    });
+
+    window.dispatchEvent(new Event('resize'));
+  </script>
+</body>
+
+</html>

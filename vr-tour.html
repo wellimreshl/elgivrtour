@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>360 Street View Tour</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <!-- Font Awesome for Audio Icon -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+    }
+
+    a-scene {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* Loading overlay */
+    #loadingOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      color: white;
+      font-family: Arial, sans-serif;
+      transition: opacity 0.5s ease;
+    }
+
+    #loadingOverlay.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Cinematic Transition Overlay */
+    #transitionOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      z-index: 9998;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    #transitionOverlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #4CC3D9;
+      animation: spin 1s ease-in-out infinite;
+      margin-bottom: 20px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* UI Buttons */
+    #exitVRBtn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-family: 'Segoe UI', sans-serif;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #audioBtn {
+      position: fixed;
+      top: 70px;
+      right: 20px;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 50%;
+      cursor: pointer;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    body.vr-mode #exitVRBtn,
+    body.vr-mode #audioBtn {
+      display: none;
+    }
+
+    /* Double-tap instruction overlay */
+    #instructionOverlay {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      z-index: 10000;
+      display: none;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    #instructionOverlay.show {
+      display: block;
+      animation: fadeInOut 3s ease-in-out;
+    }
+
+    @keyframes fadeInOut {
+      0% {
+        opacity: 0;
+      }
+
+      20% {
+        opacity: 1;
+      }
+
+      80% {
+        opacity: 1;
+      }
+
+      100% {
+        opacity: 0;
+      }
+    }
+
+    /* Double-tap hint */
+    #doubleTapHint {
+      position: fixed;
+      top: 20px;
+      right: 140px;
+      /* Offset to avoid exit button */
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      padding: 8px 15px;
+      border-radius: 10px;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      z-index: 10000;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    /* Warning info display */
+    .warning-info {
+      position: absolute;
+      background: rgba(255, 87, 34, 0.9);
+      color: white;
+      padding: 8px 15px;
+      border-radius: 10px;
+      font-size: 14px;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 9999;
+      font-weight: bold;
+      border: 2px solid white;
+    }
+
+    /* Mini Map */
+    #miniMap {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 150px;
+      height: 150px;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      z-index: 1000;
+      pointer-events: auto;
+      overflow: hidden;
+      backdrop-filter: blur(5px);
+    }
+
+    .map-radar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(76, 195, 217, 0.1) 0%, rgba(0, 0, 0, 0) 70%);
+      transform-origin: center center;
+    }
+
+    .map-grid {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 90%;
+      height: 90%;
+      transform: translate(-50%, -50%);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+    }
+
+    .map-user-arrow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-bottom: 12px solid #4CC3D9;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+    }
+
+    .map-dot {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: white;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .map-dot:hover {
+      transform: translate(-50%, -50%) scale(1.5);
+      background: #ea2f1c;
+      z-index: 10;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Loading & Transition Overlays -->
+  <div id="loadingOverlay">
+    <div class="spinner"></div>
+    <div>Loading Panorama...</div>
+  </div>
+  <div id="transitionOverlay"></div>
+
+  <!-- UI Elements -->
+  <button id="exitVRBtn"><i class="fas fa-sign-out-alt"></i> Exit VR</button>
+  <button id="audioBtn" title="Toggle Audio"><i class="fas fa-volume-mute"></i></button>
+  <div id="instructionOverlay"></div>
+  <div id="doubleTapHint">Double-tap anywhere to go where arrow points</div>
+
+  <div id="miniMap">
+    <div class="map-radar" id="mapRadar">
+      <div class="map-grid"></div>
+      <div class="map-user-arrow"></div>
+    </div>
+  </div>
+
+  <a-scene webxr="referenceSpaceType: local-floor" vr-mode-ui="enabled: true" cursor="rayOrigin: mouse"
+    raycaster="objects: .clickable, .arrow-target">
+
+    <a-assets timeout="30000">
+      <!-- Only load initial panorama and essential assets -->
+      <!-- Other panoramas will be loaded dynamically on navigation -->
+      <img id="pano1" src="Assets/img1.jpg">
+
+      <!-- Navigation and UI assets -->
+      <img id="navArrow" src="Assets/arrow.png">
+      <img id="cursorArrowImg" src="Assets/arrow.png">
+      <img id="warningImg" src="Assets/warning.png">
+    </a-assets>
+
+    <a-sky id="sky" src="#pano1" rotation="0 90 0" material="shader: flat;"></a-sky>
+
+    <a-entity id="rig" position="0 0 0">
+      <a-entity id="camera" camera look-controls>
+        <a-entity cursor="rayOrigin: entity; fuse: true; fuseTimeout: 2000;"
+          raycaster="objects: .clickable, .arrow-target"
+          geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03" material="color: #4CC3D9; shader: flat"
+          position="0 0 -1">
+        </a-entity>
+      </a-entity>
+    </a-entity>
+
+    <a-entity id="hotspots"></a-entity>
+    <a-entity id="warningPoints"></a-entity>
+
+    <a-plane id="groundPlane" position="0 -1.5 0" rotation="-90 0 0" width="10000" height="10000" visible="false"
+      class="arrow-target"></a-plane>
+
+    <a-entity id="cursorArrow" position="0 -1.5 -5" rotation="-90 0 0" class="clickable">
+      <a-image src="#cursorArrowImg" scale="1.5 1.5 1.5" material="shader: flat; transparent: true; alphaTest: 0.01;">
+        <a-animation attribute="position" dur="1500" to="0 0 -0.3" direction="alternate" repeat="indefinite"
+          easing="ease-in-out"></a-animation>
+      </a-image>
+    </a-entity>
+  </a-scene>
+
+  <script>
+    // --- USER DATA START ---
+
+    const warningPoints = [
+      {
+        id: "", name: "", position: "3.0 -1.5 10.0", rotation: "0 189 0",
+        scale: "3.2 3.2 3.2", location: "point1", message: "Click to see warning details"
+      },
+      {
+        id: "", name: "", position: "5.0 -0.8 2.0", rotation: "0 267 0",
+        scale: "2.4 2.4 2.4", location: "point21", message: "Click to see warning details"
+      },
+      {
+        id: "", name: "", position: "-10.0 -0.5 0.0", rotation: "0 92 0",
+        scale: "2.9 2.9 2.9", location: "point10", message: "Click to see warning details"
+      },
+      {
+        id: "", name: "", position: "0.0 -1.5 6.0", rotation: "0 187 0",
+        scale: "2.3 2.3 2.3", location: "point10", message: "Click to see warning details"
+      },
+      {
+        id: "", name: "", position: "-1.0 -1.5 -8.0", rotation: "0 15 0",
+        scale: "2.5 2.5 2.5", location: "point31", message: "Click to see warning details"
+      },
+      {
+        id: "", name: "Warning 1", position: "20.0 -1.5 6.0", rotation: "0 181 0",
+        scale: "2 2 2", location: "point38", message: "Click to see warning details"
+      },
+      {
+        id: "", name: "", position: "0.0 -1.5 7.0", rotation: "0 188 0",
+        scale: "2 2 2", location: "point38", message: "Click to see warning details"
+      }
+    ];
+
+    const nodes = {
+      point1: {
+        skyId: "#pano1",
+        yaw: 90,
+        hotspots: [
+          { id: "hs1", position: "-10 -1 -2", rotation: "0 -90 0", scale: "1.5 1.5 1.5", target: "point2" },
+          { id: "hs2", position: "20 -1 0", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point3" },
+          { id: "hs3", position: "20 -1 -20", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point4" }
+        ]
+      },
+      point2: {
+        skyId: "#pano2",
+        yaw: 85,
+        hotspots: [
+          { id: "hs4", position: "0 -0.5 -5", rotation: "0 180 0", scale: "1 1 1", target: "point1" }
+        ]
+      },
+      point3: {
+        skyId: "#pano3",
+        yaw: -25,
+        hotspots: [
+          { id: "hs5", position: "-10 -1 -25", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point1" }
+        ]
+      },
+      point4: {
+        skyId: "#pano4",
+        yaw: -90,
+        hotspots: [
+          { id: "hs6", position: "-3 -1 6", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point1" },
+          { id: "hs7", position: "-2 -0.9 -30", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point5" }
+        ]
+      },
+      point5: {
+        skyId: "#pano5",
+        yaw: -90,
+        hotspots: [
+          { id: "hs8", position: "-2 -1 13", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point4" },
+          { id: "hs9", position: "2 -0.9 -20", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point6" }
+        ]
+      },
+      point6: {
+        skyId: "#pano6",
+        yaw: -90,
+        hotspots: [
+          { id: "hs10", position: "0.8 -0.9 15", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point5" },
+          { id: "hs11", position: "-1 -1 -25", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point7" }
+        ]
+      },
+      point7: {
+        skyId: "#pano7",
+        yaw: 90,
+        hotspots: [
+          { id: "hs12", position: "0 -1 30", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point6" },
+          { id: "hs13", position: "0 -1 -20", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point8" }
+        ]
+      },
+      point8: {
+        skyId: "#pano8",
+        yaw: -90,
+        hotspots: [
+          { id: "hs14", position: "-2 -1 20", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point7" },
+          { id: "hs15", position: "-15 -1 -30", rotation: "0 0 0", scale: "2 2 2", target: "point9" }
+        ]
+      },
+      point9: {
+        skyId: "#pano9",
+        yaw: -205,
+        hotspots: [
+          { id: "hs16", position: "5 -1 20", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point8" },
+          { id: "hs17", position: "0 -2 -20", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point10" },
+          { id: "hs46", position: "150 -2 -10", rotation: "0 90 0", scale: "8 8 8", target: "point21" }
+        ]
+      },
+      point10: {
+        skyId: "#pano10",
+        yaw: -80,
+        hotspots: [
+          { id: "hs18", position: "13 -1 1", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point9" },
+          { id: "hs19", position: "1 -1 -20", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point11" }
+        ]
+      },
+      point11: {
+        skyId: "#pano11",
+        yaw: 90,
+        hotspots: [
+          { id: "hs20", position: "2 -1 12", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point10" },
+          { id: "hs21", position: "-2.8 -2 -15", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point12" }
+        ]
+      },
+      point12: {
+        skyId: "#pano12",
+        yaw: -90,
+        hotspots: [
+          { id: "hs22", position: "3.2 -5 15", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point11" },
+          { id: "hs23", position: "-18 -2 -15", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point13" }
+        ]
+      },
+      point13: {
+        skyId: "#pano13",
+        yaw: 90,
+        hotspots: [
+          { id: "hs24", position: "10 -1 12", rotation: "0 45 0", scale: "1.5 1.5 1.5", target: "point12" },
+          { id: "hs25", position: "10 -4 -18", rotation: "0 0 0", scale: "2 2 2", target: "point14" }
+        ]
+      },
+      point14: {
+        skyId: "#pano14",
+        yaw: -80,
+        hotspots: [
+          { id: "hs26", position: "0 -4 15", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point13" },
+          { id: "hs27", position: "0 -4 -25", rotation: "0 0 0", scale: "2 2 2", target: "point15" }
+        ]
+      },
+      point15: {
+        skyId: "#pano15",
+        yaw: 180,
+        hotspots: [
+          { id: "hs28", position: "0 -1 13", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point14" },
+          { id: "hs29", position: "2 -4 -20", rotation: "0 0 0", scale: "2 2 2", target: "point16" }
+
+        ]
+      },
+      point16: {
+        skyId: "#pano16",
+        yaw: 180,
+        hotspots: [
+          { id: "hs30", position: "2 -1 20", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point15" },
+          { id: "hs31", position: "-6 -4 -15", rotation: "0 0 0", scale: "2 2 2", target: "point17" },
+          { id: "hs32", position: "-3.2 -4 -20", rotation: "0 0 0", scale: "2 2 2", target: "point18" }
+        ]
+      },
+      point17: {
+        skyId: "#pano17",
+        yaw: -145,
+        hotspots: [
+          { id: "hs33", position: "8 -3 -1.8", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point16" },
+          { id: "hs34", position: "-4 -4 -15", rotation: "0 0 0", scale: "2 2 2", target: "point18" }
+        ]
+      },
+      point18: {
+        skyId: "#pano18",
+        yaw: 0,
+        hotspots: [
+          { id: "hs35", position: "10 -4 5", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point17" },
+          { id: "hs36", position: "8 -4 -12", rotation: "0 135 0", scale: "1.5 1.5 1.5", target: "point19" },
+          { id: "hs37", position: "-10 -4 -1.5", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point20" },
+        ]
+      },
+      point19: {
+        skyId: "#pano19",
+        yaw: -90,
+        hotspots: [
+          { id: "hs38", position: "9 -6 -19", rotation: "0 135 0", scale: "2 2 2", target: "point18" },
+        ]
+      },
+      point20: {
+        skyId: "#pano20",
+        yaw: 0,
+        hotspots: [
+          { id: "hs38", position: "30 -6 2", rotation: "0 90 0", scale: "3 3 3", target: "point18" },
+          { id: "hs39", position: "25 -6 -105", rotation: "0 0 0", scale: "6 6 6", target: "point21" },
+          { id: "hs40", position: "-20 -6 -30", rotation: "0 0 0", scale: "6 6 6", target: "point22" },
+        ]
+      },
+      point21: {
+        skyId: "#pano21",
+        yaw: 90,
+        hotspots: [
+          { id: "hs41", position: "35 -6 -165", rotation: "0 180 0", scale: "10 10 10", target: "point20" },
+          { id: "hs42", position: "-145 -6 1", rotation: "0 90 0", scale: "7 7 7", target: "point9" },
+        ]
+      },
+      point22: {
+        skyId: "#pano22",
+        yaw: -90,
+        hotspots: [
+          { id: "hs43", position: "0 -6 -15", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point23" },
+          { id: "hs44", position: "-30 -6 30", rotation: "0 0 0", scale: "3 3 3", target: "point20" },
+          { id: "hs45", position: "35 -6 20", rotation: "0 45 0", scale: "3 3 3", target: "point21" }
+        ]
+      },
+      // hs46 is in point9
+      point23: {
+        skyId: "#pano23",
+        yaw: -90,
+        hotspots: [
+          { id: "hs47", position: "1 -6 40", rotation: "0 180 0", scale: "4 4 4", target: "point22" },
+          { id: "hs48", position: "3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point24" }
+
+        ]
+      },
+      point24: {
+        skyId: "#pano24",
+        yaw: -120,
+        hotspots: [
+          { id: "hs49", position: "1 -6 40", rotation: "0 180 0", scale: "4 4 4", target: "point23" },
+          { id: "hs50", position: "3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point25" }
+
+        ]
+      },
+      point25: {
+        skyId: "#pano25",
+        yaw: 90,
+        hotspots: [
+          { id: "hs51", position: "1 -6 40", rotation: "0 180 0", scale: "4 4 4", target: "point24" },
+          { id: "hs52", position: "3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point26" }
+        ]
+      },
+      point26: {
+        skyId: "#pano26",
+        yaw: -90,
+        hotspots: [
+          { id: "hs53", position: "-45 -6 -2", rotation: "0 90 0", scale: "4 4 4", target: "point25" },
+          { id: "hs54", position: "3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point27" },
+          { id: "hs55", position: "35 -6 8", rotation: "0 90 0", scale: "6 6 6", target: "point43" }
+
+        ]
+      },
+      point27: {
+        skyId: "#pano27",
+        yaw: 0,
+        hotspots: [
+          { id: "hs56", position: "1 -6 25", rotation: "0 180 0", scale: "4 4 4", target: "point26" },
+          { id: "hs57", position: "-3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point28" }
+        ]
+      },
+      point28: {
+        skyId: "#pano28",
+        yaw: -20,
+        hotspots: [
+          { id: "hs58", position: "-2 -6 25", rotation: "0 180 0", scale: "4 4 4", target: "point27" },
+          { id: "hs59", position: "-3 -6 -35", rotation: "0 180 0", scale: "6 6 6", target: "point31" },
+          { id: "hs60", position: "-25 -10 -3", rotation: "0 90 0", scale: "6 6 6", target: "point29" }
+        ]
+      },
+      point29: {
+        skyId: "#pano29",
+        yaw: 122,
+        hotspots: [
+          { id: "hs60", position: "4.5 -10 25", rotation: "0 180 0", scale: "4 4 4", target: "point28" },
+          { id: "hs61", position: "-3 -6 -35", rotation: "0 180 0", scale: "6 6 6", target: "point30" }
+        ]
+      },
+      point30: {
+        skyId: "#pano30",
+        yaw: 47,
+        hotspots: [
+          { id: "hs62", position: "4.5 -10 25", rotation: "0 180 0", scale: "4 4 4", target: "point29" }
+        ]
+      },
+      point31: {
+        skyId: "#pano31",
+        yaw: -95,
+        hotspots: [
+          { id: "hs63", position: "0 -10 35", rotation: "0 180 0", scale: "6 6 6", target: "point29" },
+          { id: "hs64", position: "30 -6 -4", rotation: "0 90 0", scale: "3 3 3", target: "point32" }
+        ]
+      },
+      point32: {
+        skyId: "#pano32",
+        yaw: 0,
+        hotspots: [
+          { id: "hs65", position: "0 -10 35", rotation: "0 180 0", scale: "6 6 6", target: "point31" },
+          { id: "hs66", position: "0 -6 -40", rotation: "0 180 0", scale: "6 6 6", target: "point33" }
+        ]
+      },
+      point33: {
+        skyId: "#pano33",
+        yaw: 180,
+        hotspots: [
+          { id: "hs67", position: "0 -10 100", rotation: "0 180 0", scale: "10 10 10", target: "point32" },
+          { id: "hs68", position: "0 -6 -40", rotation: "0 180 0", scale: "6 6 6", target: "point34" }
+        ]
+      },
+      point34: {
+        skyId: "#pano34",
+        yaw: 180,
+        hotspots: [
+          { id: "hs69", position: "0 -10 100", rotation: "0 180 0", scale: "10 10 10", target: "point33" },
+          { id: "hs70", position: "0 -6 -40", rotation: "0 180 0", scale: "6 6 6", target: "point35" }
+        ]
+      },
+      point35: {
+        skyId: "#pano35",
+        yaw: 180,
+        hotspots: [
+          { id: "hs71", position: "0 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point34" },
+          { id: "hs72", position: "0 -6 -40", rotation: "0 180 0", scale: "4 4 4", target: "point36" }
+        ]
+      },
+      point36: {
+        skyId: "#pano36",
+        yaw: 170,
+        hotspots: [
+          { id: "hs73", position: "0 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point35" },
+          { id: "hs74", position: "0 -6 -40", rotation: "0 180 0", scale: "4 4 4", target: "point37" }
+        ]
+      },
+      point37: {
+        skyId: "#pano37",
+        yaw: 185,
+        hotspots: [
+          { id: "hs75", position: "0 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point36" },
+          { id: "hs76", position: "0 -6 -40", rotation: "0 180 0", scale: "4 4 4", target: "point38" }
+        ]
+      },
+      point38: {
+        skyId: "#pano38",
+        yaw: -96,
+        hotspots: [
+          { id: "hs77", position: "50 -10 1", rotation: "0 90 0", scale: "6 6 6", target: "point37" },
+          { id: "hs78", position: "0 -6 -40", rotation: "0 180 0", scale: "4 4 4", target: "point39" }
+        ]
+      },
+      point39: {
+        skyId: "#pano39",
+        yaw: -5,
+        hotspots: [
+          { id: "hs77", position: "3 -10 60", rotation: "0 180 0", scale: "6 6 6", target: "point38" },
+          { id: "hs78", position: "0 -6 -50", rotation: "0 180 0", scale: "4 4 4", target: "point40" }
+        ]
+      },
+      point40: {
+        skyId: "#pano40",
+        yaw: 0,
+        hotspots: [
+          { id: "hs79", position: "60 -10 1", rotation: "0 90 0", scale: "6 6 6", target: "point39" },
+          { id: "hs80", position: "0 -6 -50", rotation: "0 180 0", scale: "4 4 4", target: "point41" }
+        ]
+      },
+      point41: {
+        skyId: "#pano41",
+        yaw: 82,
+        hotspots: [
+          { id: "hs81", position: "-5 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point40" },
+          { id: "hs82", position: "0 -6 -60", rotation: "0 180 0", scale: "4 4 4", target: "point42" }
+        ]
+      },
+      point42: {
+        skyId: "#pano42",
+        yaw: 0,
+        hotspots: [
+          { id: "hs81", position: "-5 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point41" },
+          { id: "hs82", position: "0 -6 -60", rotation: "0 180 0", scale: "4 4 4", target: "point43" }
+        ]
+      },
+      point43: {
+        skyId: "#pano43",
+        yaw: 0,
+        hotspots: [
+          { id: "hs83", position: "-2 -10 80", rotation: "0 180 0", scale: "6 6 6", target: "point42" },
+          { id: "hs84", position: "10 -6 -120", rotation: "0 180 0", scale: "10 10 10", target: "point26" }
+        ]
+      },
+    };
+
+    // --- USER DATA END ---
+
+    // Elements
+    const scene = document.querySelector("a-scene");
+    const sky = document.querySelector("#sky");
+    const camera = document.querySelector("#camera");
+    const hotspotsContainer = document.querySelector("#hotspots");
+    const warningPointsContainer = document.querySelector("#warningPoints");
+    const rig = document.querySelector("#rig");
+    const cursorArrow = document.querySelector("#cursorArrow");
+    const groundPlane = document.querySelector("#groundPlane");
+    const instructionOverlay = document.querySelector("#instructionOverlay");
+    const doubleTapHint = document.querySelector("#doubleTapHint");
+    const exitVRBtn = document.getElementById("exitVRBtn");
+    const audioBtn = document.getElementById("audioBtn");
+    const loadingOverlay = document.getElementById("loadingOverlay");
+    const transitionOverlay = document.getElementById("transitionOverlay");
+
+    let canvas = null;
+    let raycaster = null;
+    let assetsManager = null;
+
+    // Double-tap state
+    let lastTapTime = 0;
+    const DOUBLE_TAP_DELAY = 350;
+
+    // Navigation state
+    let currentNodeId = "point1";
+    let extraYaw = 0;
+    let isNavigating = false;
+    let currentHotspotDirections = [];
+    let currentAlignedTarget = null;
+    const ALIGNMENT_THRESHOLD = 45;
+
+    // Audio State
+    let isMuted = true;
+
+    // --- INITIALIZATION ---
+    function init() {
+      // Parse URL parameters for start location
+      const urlParams = new URLSearchParams(window.location.search);
+      const startImage = urlParams.get('image');
+
+      if (startImage) {
+        // Find node with matching pano number
+        const targetPano = `#pano${startImage}`;
+        for (const [id, node] of Object.entries(nodes)) {
+          if (node.skyId === targetPano) {
+            currentNodeId = id;
+            console.log(`🚀 Starting tour at ${id} (Image ${startImage})`);
+            break;
+          }
+        }
+      }
+
+      // Safety timeout for loading
+      setTimeout(() => {
+        if (loadingOverlay && loadingOverlay.style.display !== 'none') {
+          console.warn("Forcing loading overlay hide");
+          loadingOverlay.style.display = 'none';
+        }
+      }, 5000);
+
+      scene.addEventListener("loaded", () => {
+        canvas = scene.canvas;
+        raycaster = scene.systems.raycaster;
+        assetsManager = scene.assets;
+
+        initCursorArrow();
+        setupDoubleTap();
+        setupUI();
+
+        // Initial Load
+        loadNode(currentNodeId);
+
+        // Hide loading
+        loadingOverlay.classList.add('fade-out');
+        setTimeout(() => loadingOverlay.style.display = 'none', 500);
+      });
+    }
+
+    function setupUI() {
+      // Exit VR
+      exitVRBtn.addEventListener("click", () => window.location.href = "index.html");
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") window.location.href = "index.html"; });
+
+      // Audio Toggle
+      audioBtn.addEventListener("click", () => {
+        isMuted = !isMuted;
+        audioBtn.querySelector("i").className = isMuted ? "fas fa-volume-mute" : "fas fa-volume-up";
+        // Logic to mute/unmute sounds would go here
+      });
+
+      // VR Mode Listeners
+      scene.addEventListener("enter-vr", () => document.body.classList.add("vr-mode"));
+      scene.addEventListener("exit-vr", () => document.body.classList.remove("vr-mode"));
+    }
+
+    // --- WARNING POINTS LOGIC ---
+    function loadWarningPointsForLocation(locationId) {
+      warningPointsContainer.innerHTML = "";
+      warningPoints.forEach((pointData) => {
+        if (pointData.location === locationId) {
+          createWarningPointElement(pointData);
+        }
+      });
+    }
+
+    function createWarningPointElement(pointData) {
+      const warningEntity = document.createElement('a-entity');
+      warningEntity.setAttribute('class', 'warning-point clickable');
+      warningEntity.setAttribute('position', pointData.position);
+      warningEntity.setAttribute('rotation', pointData.rotation);
+
+      const warningImage = document.createElement('a-image');
+      warningImage.setAttribute('src', '#warningImg');
+      warningImage.setAttribute('scale', pointData.scale);
+      warningImage.setAttribute('material', 'shader: flat; transparent: true; alphaTest: 0.01;');
+
+      warningImage.setAttribute('animation', `property: scale; from: ${pointData.scale}; to: ${pointData.scale.split(' ').map(x => parseFloat(x) * 1.2).join(' ')}; dir: alternate; loop: true; dur: 1000; easing: easeInOutSine`);
+
+      warningEntity.appendChild(warningImage);
+
+      // Label
+      const nameLabel = document.createElement('a-text');
+      nameLabel.setAttribute('value', pointData.name || "Warning");
+      nameLabel.setAttribute('color', '#FF5722');
+      nameLabel.setAttribute('position', '0 2 0');
+      nameLabel.setAttribute('align', 'center');
+      nameLabel.setAttribute('scale', '2 2 2');
+      nameLabel.setAttribute('look-at', '[camera]');
+      warningEntity.appendChild(nameLabel);
+
+      warningEntity.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showWarningMessage(pointData.name || "Warning", pointData.message);
+      });
+
+      warningEntity.addEventListener('mouseenter', () => { if (canvas) canvas.style.cursor = 'pointer'; });
+      warningEntity.addEventListener('mouseleave', () => { if (canvas) canvas.style.cursor = 'default'; });
+
+      warningPointsContainer.appendChild(warningEntity);
+    }
+
+    function showWarningMessage(title, message) {
+      let display = document.getElementById('warningMessageDisplay');
+      if (!display) {
+        display = document.createElement('div');
+        display.id = 'warningMessageDisplay';
+        display.className = 'warning-info';
+        display.style.position = 'fixed'; display.style.top = '50%'; display.style.left = '50%';
+        display.style.transform = 'translate(-50%, -50%)'; display.style.zIndex = '10001';
+        display.style.textAlign = 'center'; display.style.whiteSpace = 'normal'; display.style.maxWidth = '80%';
+        document.body.appendChild(display);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = 'Close';
+        closeBtn.style.marginTop = '10px'; closeBtn.style.padding = '5px 15px';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.addEventListener('click', () => document.body.removeChild(display));
+        display.appendChild(closeBtn);
+      }
+      display.innerHTML = `<div style="margin-bottom:10px; font-size:18px;">⚠️ ${title}</div><div>${message}</div>`;
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = 'Close';
+      closeBtn.style.display = 'block'; closeBtn.style.margin = '10px auto 0';
+      closeBtn.onclick = () => { if (display.parentNode) document.body.removeChild(display); };
+      display.appendChild(closeBtn);
+
+      setTimeout(() => { if (display.parentNode) document.body.removeChild(display); }, 10000);
+    }
+
+    // --- NAVIGATION & HOTSPOTS ---
+    function buildHotspots(nodeId) {
+      hotspotsContainer.innerHTML = "";
+      currentHotspotDirections = [];
+
+      // Clear MiniMap dots
+      const mapRadar = document.getElementById("mapRadar");
+      if (mapRadar) mapRadar.querySelectorAll('.map-dot').forEach(d => d.remove());
+
+      const node = nodes[nodeId];
+      if (!node || !node.hotspots) return;
+
+      node.hotspots.forEach(conf => {
+        const hotspotYaw = positionToYaw(conf.position);
+
+        currentHotspotDirections.push({
+          yaw: hotspotYaw,
+          target: conf.target,
+          id: conf.id
+        });
+
+        // 1. VISUAL HOTSPOT (RED PIN)
+        const el = document.createElement('a-entity');
+        el.setAttribute('position', conf.position);
+        el.setAttribute('rotation', conf.rotation);
+        el.setAttribute('scale', conf.scale || "1 1 1");
+        el.setAttribute('class', 'clickable');
+
+        // Events
+        el.addEventListener('click', (e) => { e.stopPropagation(); loadNode(conf.target); });
+        el.addEventListener('mouseenter', () => {
+          if (canvas) canvas.style.cursor = 'pointer';
+          const dot = document.getElementById(`dot-${conf.id}`);
+          if (dot) dot.style.background = '#ea2f1c';
+        });
+        el.addEventListener('mouseleave', () => {
+          if (canvas) canvas.style.cursor = 'default';
+          const dot = document.getElementById(`dot-${conf.id}`);
+          if (dot) dot.style.background = 'white';
+        });
+
+        hotspotsContainer.appendChild(el);
+
+        // 2. MINI-MAP DOT
+        if (mapRadar) {
+          const mapDot = document.createElement('div');
+          mapDot.className = 'map-dot';
+          mapDot.id = `dot-${conf.id}`;
+          mapDot.title = conf.target;
+
+          const rad = hotspotYaw * (Math.PI / 180);
+          const r = 40;
+          const left = 50 + r * Math.sin(rad);
+          const top = 50 - r * Math.cos(rad);
+          mapDot.style.left = `${left}%`; mapDot.style.top = `${top}%`;
+
+          mapDot.addEventListener('click', (e) => { e.stopPropagation(); loadNode(conf.target); });
+          mapRadar.appendChild(mapDot);
+        }
+      });
+
+      console.log("Built hotspots for", nodeId);
+    }
+
+    // Image cache to avoid reloading
+    const loadedImages = new Map();
+
+    async function loadPanoramaImage(panoNumber) {
+      const imgSrc = `Assets/img${panoNumber}.jpg`;
+
+      // Check if already loaded
+      if (loadedImages.has(panoNumber)) {
+        return loadedImages.get(panoNumber);
+      }
+
+      // Create and load image
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          loadedImages.set(panoNumber, imgSrc);
+          console.log(`✅ Loaded panorama ${panoNumber}`);
+          resolve(imgSrc);
+        };
+        img.onerror = () => {
+          console.error(`❌ Failed to load panorama ${panoNumber}`);
+          reject(new Error(`Failed to load img${panoNumber}.jpg`));
+        };
+        img.src = imgSrc;
+      });
+    }
+
+    async function loadNode(nodeId) {
+      const node = nodes[nodeId];
+      if (!node) { console.warn("node not found", nodeId); return; }
+
+      // 1. Start Cinematic Transition (Fade to Black)
+      if (transitionOverlay) {
+        transitionOverlay.classList.add('active');
+        // Wait for fade to complete (800ms typically)
+        await new Promise(r => setTimeout(r, 600));
+      }
+
+      currentNodeId = nodeId;
+      currentAlignedTarget = null;
+      isNavigating = true;
+
+      // Extract panorama number from skyId (e.g., "#pano5" -> 5)
+      const panoMatch = node.skyId.match(/#pano(\d+)/);
+      const panoNumber = panoMatch ? parseInt(panoMatch[1]) : 1;
+
+      try {
+        // 2. Load the panorama image dynamically
+        const imgSrc = await loadPanoramaImage(panoNumber);
+
+        // 3. Update Sky with direct image source
+        // Wait a small frame to ensure previous texture is cleared
+        await new Promise(r => requestAnimationFrame(r));
+
+        sky.setAttribute("src", imgSrc);
+
+        // 4. Update Rotation
+        extraYaw = 0;
+        updateSkyRotation();
+
+        // Update Camera Base Rotation
+        camera.setAttribute("rotation", `0 ${node.yaw} 0`);
+
+        // Rebuild Hotspots & Warning Points
+        buildHotspots(nodeId);
+        loadWarningPointsForLocation(nodeId);
+
+        // Wait for texture to upload to GPU
+        await new Promise(r => setTimeout(r, 100));
+
+      } catch (error) {
+        console.error("Error loading panorama:", error);
+        sky.setAttribute("src", "Assets/img1.jpg");
+      }
+
+      // UI Updates
+      const arrowImage = cursorArrow.querySelector("a-image");
+      if (arrowImage) arrowImage.setAttribute("scale", "1.5 1.5 1.5");
+      lastTapTime = 0;
+      doubleTapHint.textContent = `Double-tap anywhere to go where arrow points`;
+
+      // 5. Fade In (Reveal new location)
+      if (transitionOverlay) {
+        transitionOverlay.classList.remove('active');
+      }
+
+      setTimeout(() => isNavigating = false, 500);
+      console.log("Now at:", currentNodeId);
+
+      // Preload adjacent panoramas in background
+      preloadAdjacentPanoramas(nodeId);
+    }
+
+    function preloadAdjacentPanoramas(nodeId) {
+      const node = nodes[nodeId];
+      if (!node || !node.hotspots) return;
+
+      // Preload panoramas for connected nodes
+      node.hotspots.forEach(hotspot => {
+        const targetNode = nodes[hotspot.target];
+        if (targetNode) {
+          const panoMatch = targetNode.skyId.match(/#pano(\d+)/);
+          if (panoMatch) {
+            const panoNumber = parseInt(panoMatch[1]);
+            // Load in background without awaiting
+            loadPanoramaImage(panoNumber).catch(() => { });
+          }
+        }
+      });
+    }
+
+    // --- HELPER FUNCTIONS ---
+    function positionToYaw(positionStr) {
+      const parts = positionStr.trim().split(/\s+/);
+      if (parts.length !== 3) return 0;
+      const x = parseFloat(parts[0]) || 0;
+      const z = parseFloat(parts[2]) || 0;
+      return Math.atan2(x, -z) * (180 / Math.PI);
+    }
+
+    function normalizeAngle(angle) {
+      while (angle > 180) angle -= 360;
+      while (angle < -180) angle += 360;
+      return angle;
+    }
+
+    function angleDifference(angle1, angle2) {
+      const diff = normalizeAngle(angle1 - angle2);
+      return Math.abs(diff);
+    }
+
+    function updateSkyRotation() {
+      const node = nodes[currentNodeId];
+      const base = node ? node.yaw : 0;
+      sky.setAttribute("rotation", `0 ${-(base + extraYaw)} 0`);
+    }
+
+    function showInstruction(message) {
+      instructionOverlay.textContent = message;
+      instructionOverlay.classList.remove('show');
+      void instructionOverlay.offsetWidth;
+      instructionOverlay.classList.add('show');
+    }
+
+    function setupDoubleTap() {
+      canvas.onclick = null; canvas.ontouchstart = null;
+      canvas.addEventListener('click', handleDoubleTap);
+      canvas.addEventListener('touchstart', function (e) { e.preventDefault(); handleDoubleTap(e); }, { passive: false });
+    }
+
+    function handleDoubleTap(event) {
+      if (isNavigating) return;
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastTapTime;
+
+      if (timeDiff < DOUBLE_TAP_DELAY && timeDiff > 0) {
+        lastTapTime = 0;
+        if (currentAlignedTarget) {
+          showInstruction("Going to " + currentAlignedTarget);
+          loadNode(currentAlignedTarget);
+        } else {
+          showInstruction("Point arrow at a navigation point first");
+        }
+      } else {
+        lastTapTime = currentTime;
+        if (currentAlignedTarget) showInstruction("Double-tap to go to " + currentAlignedTarget);
+        else showInstruction("Move cursor to align with a navigation point");
+      }
+    }
+
+    function initCursorArrow() {
+      const GROUND_HEIGHT = -1.5;
+      const MIN_ARROW_DISTANCE = 3;
+      const mouse = new THREE.Vector2(0, 0);
+      let isVRMode = false;
+
+      scene.addEventListener("enter-vr", () => isVRMode = true);
+      scene.addEventListener("exit-vr", () => isVRMode = false);
+
+      canvas.addEventListener("mousemove", (event) => {
+        if (!isVRMode) {
+          mouse.x = (event.clientX / canvas.clientWidth) * 2 - 1;
+          mouse.y = -(event.clientY / canvas.clientHeight) * 2 + 1;
+        }
+      });
+
+      function updateArrow() {
+        const cameraObj = camera.getObject3D("camera");
+        if (!cameraObj) return;
+        const mapRadar = document.getElementById("mapRadar");
+
+        // MiniMap Rotation
+        const vector = new THREE.Vector3(0, 0, -1);
+        vector.applyQuaternion(cameraObj.quaternion);
+        const rotationMap = 180 - (Math.atan2(vector.x, vector.z) * 180 / Math.PI);
+        if (mapRadar) mapRadar.style.transform = `rotate(${rotationMap}deg)`;
+
+        let raycasterObj;
+        if (isVRMode) {
+          const cameraWorldPos = new THREE.Vector3();
+          cameraObj.getWorldPosition(cameraWorldPos);
+          const forward = new THREE.Vector3(0, 0, -1);
+          forward.applyQuaternion(cameraObj.quaternion);
+          raycasterObj = new THREE.Raycaster(cameraWorldPos, forward);
+        } else {
+          raycasterObj = new THREE.Raycaster();
+          raycasterObj.setFromCamera(mouse, cameraObj);
+        }
+
+        const groundMesh = groundPlane.getObject3D("mesh");
+        if (groundMesh) {
+          const intersects = raycasterObj.intersectObject(groundMesh);
+          if (intersects.length > 0) {
+            const cameraWorldPos = new THREE.Vector3();
+            cameraObj.getWorldPosition(cameraWorldPos);
+            const intersectionPoint = intersects[0].point;
+            const direction = new THREE.Vector3().subVectors(intersectionPoint, cameraWorldPos).normalize();
+            const groundDirection = new THREE.Vector3(direction.x, 0, direction.z).normalize();
+            const distanceToIntersection = cameraWorldPos.distanceTo(intersectionPoint);
+            const arrowDistance = Math.max(distanceToIntersection, MIN_ARROW_DISTANCE);
+
+            const arrowPosition = new THREE.Vector3().copy(cameraWorldPos).add(groundDirection.multiplyScalar(arrowDistance));
+            arrowPosition.y = GROUND_HEIGHT;
+
+            cursorArrow.setAttribute("position", `${arrowPosition.x} ${GROUND_HEIGHT} ${arrowPosition.z}`);
+            cursorArrow.setAttribute("rotation", `-90 0 0`);
+
+            // Arrow rotation (camera relative)
+            const cameraRotation = camera.getAttribute("rotation");
+            const cameraYaw = cameraRotation ? cameraRotation.y : 0;
+            const arrowImage = cursorArrow.querySelector("a-image");
+            if (arrowImage) arrowImage.setAttribute("rotation", `0 0 ${cameraYaw}`);
+
+            // Check alignment
+            const dx = arrowPosition.x - cameraWorldPos.x;
+            const dz = arrowPosition.z - cameraWorldPos.z;
+            const worldYaw = Math.atan2(dx, -dz) * (180 / Math.PI);
+            checkHotspotAlignment(worldYaw);
+          }
+        }
+      }
+
+      function checkHotspotAlignment(arrowYaw) {
+        let alignedTarget = null;
+        let minDifference = ALIGNMENT_THRESHOLD;
+        let closestDifference = Infinity;
+
+        currentHotspotDirections.forEach(hotspot => {
+          const diff = angleDifference(arrowYaw, hotspot.yaw);
+          if (diff < minDifference && diff < closestDifference) {
+            closestDifference = diff;
+            alignedTarget = hotspot.target;
+          }
+        });
+
+        if (alignedTarget !== currentAlignedTarget) {
+          currentAlignedTarget = alignedTarget;
+          const arrowImage = cursorArrow.querySelector("a-image");
+          if (arrowImage) {
+            if (alignedTarget) {
+              arrowImage.setAttribute("scale", "1.8 1.8 1.8");
+              if (canvas) canvas.style.cursor = "pointer";
+              doubleTapHint.textContent = `Double-tap to go to ${alignedTarget}`;
+            } else {
+              arrowImage.setAttribute("scale", "1.5 1.5 1.5");
+              if (canvas) canvas.style.cursor = "default";
+              doubleTapHint.textContent = `Double-tap anywhere to go where arrow points`;
+            }
+          }
+        }
+      }
+
+      function tick() { updateArrow(); requestAnimationFrame(tick); }
+      tick();
+    }
+
+    init();
+  </script>
+</body>
+
+</html>
