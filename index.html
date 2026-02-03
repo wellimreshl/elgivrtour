@@ -1409,7 +1409,7 @@
   <!-- LOADING -->
   <div id="loadingScreen">
     <div class="loading-card">
-      <img src="Assets/ELGIEQUIP.png" alt="ELGi Logo">
+      <img src="assets/elgiequip.png" alt="ELGi Logo">
       <h2>ELGi Industrial Plant</h2>
       <div class="spinner"></div>
       <span>Preparing 3D environment...</span>
@@ -1838,7 +1838,7 @@
         this.loadingQueue = [];
         this.currentImageIndex = -1;
         this.totalImages = 43;
-        this.imageBasePath = './images/';
+        this.imageBasePath = './assets/';
         this.bannerFallback = null;
 
         this.createBannerFallback();
@@ -1864,12 +1864,12 @@
         const normalizedKey = this.normalizeImageKey(imageKey);
 
         if (normalizedKey === 'banner') {
-          return `${this.imageBasePath}banner.png`;
+          return `./images/banner.png`;
         }
 
         const numKey = parseInt(normalizedKey);
         if (!isNaN(numKey) && numKey >= 1 && numKey <= this.totalImages) {
-          return `${this.imageBasePath}${numKey}.jpg`;
+          return `${this.imageBasePath}img${numKey}.jpg`;
         }
 
         return `${this.imageBasePath}${normalizedKey}.jpg`;
@@ -2009,7 +2009,7 @@
     class AudioPlayer {
       constructor() {
         this.audioElements = new Map();
-        this.audioBasePath = './audio/';
+        this.audioBasePath = './Audio/';
         this.currentlyPlaying = null;
         this.isPlaying = false;
         this.volume = 0.7;

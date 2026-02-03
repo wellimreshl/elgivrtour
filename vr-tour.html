@@ -294,12 +294,12 @@
     <a-assets timeout="30000">
       <!-- Only load initial panorama and essential assets -->
       <!-- Other panoramas will be loaded dynamically on navigation -->
-      <img id="pano1" src="Assets/img1.jpg">
+      <img id="pano1" src="assets/img1.jpg">
 
       <!-- Navigation and UI assets -->
-      <img id="navArrow" src="Assets/arrow.png">
-      <img id="cursorArrowImg" src="Assets/arrow.png">
-      <img id="warningImg" src="Assets/warning.png">
+      <img id="navArrow" src="assets/arrow.png">
+      <img id="cursorArrowImg" src="assets/arrow.png">
+      <img id="warningImg" src="assets/warning.png">
     </a-assets>
 
     <a-sky id="sky" src="#pano1" rotation="0 90 0" material="shader: flat;"></a-sky>
@@ -958,7 +958,7 @@
     const loadedImages = new Map();
 
     async function loadPanoramaImage(panoNumber) {
-      const imgSrc = `Assets/img${panoNumber}.jpg`;
+      const imgSrc = `assets/img${panoNumber}.jpg`;
 
       // Check if already loaded
       if (loadedImages.has(panoNumber)) {
