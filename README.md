@@ -82,6 +82,34 @@ This application is fully production-ready with:
 - ✅ Mobile responsive design
 - ✅ HTTPS-ready CDN dependencies
 
+## 🔧 Troubleshooting GitHub Pages
+
+### Black Screen in VR Tour
+**Cause**: Asset loading failure due to incorrect paths  
+**Solution**: 
+- Verify all image files are in the `assets/` folder
+- Check browser console (F12) for 404 errors
+- Ensure `.nojekyll` file exists in root directory
+
+### Logo Not Loading
+**Cause**: Incorrect path or missing file  
+**Solution**:
+- Confirm `assets/elgiequip.png` exists
+- Check file name matches exactly (case-sensitive)
+
+### Buttons Not Arranged Properly
+**Cause**: CSS not loading or viewport issues  
+**Solution**:
+- Clear browser cache (Ctrl+Shift+R)
+- Check responsive design on different screen sizes
+- Verify all CSS is inline in HTML files
+
+### 404 Errors for Images
+**Cause**: Case sensitivity on GitHub Pages servers  
+**Solution**:
+- All paths must use lowercase: `assets/img1.jpg` not `Assets/img1.jpg`
+- File names must match exactly
+
 ## 📝 License
 
 © 2026 ELGI Equipment Limited. All rights reserved.
